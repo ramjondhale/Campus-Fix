@@ -17,14 +17,14 @@ _Last updated: 2026-10-06 — by orchestrator._
 |-------|--------|-------|--------|-------------------|-------|
 | S0.1 Repo + docs | ✅ | O | main | 0ba9dfb | Repo, git, .gitignore, README, REQUIREMENTS, ARCHITECTURE, ORCHESTRATION, PLAN, RUN-LEDGER. |
 | S0.2 Flutter scaffold | ✅ | O | main | _this commit_ | 2 packages + 2 apps; Riverpod+go_router; path deps; analyze clean; admin web build ✓. |
-| S0.3 Detailed specs | ⬜ | A | | | data-model, priority, status, assignment, privacy, screens. |
+| S0.3 Detailed specs | 🟡 | A | agent/S0.3-specs | | data-model ✅ (O-authored); priority/status/assignment/privacy/screens in progress. |
 | S1.1 Design foundations | ⬜ | O/A | | | tokens + Claude Design project. |
 | S1.2 Core components | ⬜ | O/A | | | reusable component set. |
 | S1.3 Reporter screens | ⬜ | A | | | login→report→track→board→notifications. |
 | S1.4 Maintenance+verifier screens | ⬜ | A | | | assigned/work/after-repair/verify. |
 | S1.5 Admin web screens | ⬜ | A | | | dashboard/list/manage. |
 | S1.6 Design→code handoff | ⬜ | A | | | component↔widget map. |
-| S2.1 Models & enums | ⬜ | A | | | spine of core. |
+| S2.1 Models & enums | ✅ | A | merged | 5c1b2bb | 8 enums, 6 models, id gen, 2 repo interfaces; 73 tests green (O-verified). As-built notes folded into data-model-spec. |
 | S2.2 Priority engine | ⬜ | A | | | rule-based + tests. |
 | S2.3 Status state machine | ⬜ | A | | | role-gated transitions + tests. |
 | S2.4 Assignment routing | ⬜ | A | | | category→department + tests. |
@@ -50,7 +50,9 @@ _Last updated: 2026-10-06 — by orchestrator._
 | # | Date | Commit | What landed |
 |---|------|--------|-------------|
 | 0 | 2026-10-06 | 0ba9dfb | S0.1 foundation (docs, plan, ledger). |
-| 1 | 2026-10-06 | _this commit_ | S0.2 Flutter scaffold (2 pkgs + 2 apps, deps wired, baseline builds). |
+| 1 | 2026-10-06 | 8e330fc | S0.2 Flutter scaffold (2 pkgs + 2 apps, deps wired, baseline builds). |
+| 2 | 2026-10-06 | 761b347 | S0.3 data-model spec (core contract). |
+| 3 | 2026-10-06 | 5c1b2bb | S2.1 campusfix_core models/enums/id-gen/repo-interfaces (73 tests). |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

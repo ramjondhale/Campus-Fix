@@ -95,8 +95,22 @@ Fields: `label`, `order` (0–6). Helper `isTerminal` (true for `closed`).
 | `createdAt` | `DateTime` | |
 | `updatedAt` | `DateTime` | |
 
-Helpers: `effectivePriority` (`priorityOverride ?? priority`), `waitingTime` (`now - createdAt`),
-`copyWith`, value equality, `toJson/fromJson`.
+Helpers: `effectivePriority` (`priorityOverride ?? priority`), `Duration waitingTime(DateTime now)`
+(clamped to `Duration.zero`), `copyWith`, value equality, `toJson/fromJson`.
+
+> **As-built notes (S2.1 — authoritative for downstream chunks):**
+> - `copyWith` treats a `null` arg as "keep current". To *clear* a nullable field use the matching
+>   `clearX: true` flag: `clearPhone`, `clearDepartment`, `clearCaption`, `clearNote`,
+>   `clearAssigneeId`, `clearTitle`, `clearPriorityOverride`, `clearAssignment`, `clearResolutionNote`.
+> - `Complaint(...)` is a factory that stores the three lists as **unmodifiable**; append to the
+>   timeline with `copyWith(timeline: [...c.timeline, event])`.
+> - `Priority.rank`: `critical=0 … low=3` (ascending sort = most urgent first). `weight` is 4…1.
+> - `ProblemCategory.autoRoutable` is a getter (`defaultDepartment != null`).
+> - JSON: enums by `.name`, dates as ISO-8601; `fromJson` tolerates missing optional keys (missing
+>   list → empty, missing `safetyFlag` → false). `ReporterIdentity.toString()` / `Complaint.toString()`
+>   are PII-redacted.
+> - Complaint ID generator lives at `lib/mock/id_generator.dart`
+>   (`nextComplaintId(DateTime)`, year-scoped counter, caps at 99999 → throws).
 
 ## 3. View projections (R5/R6) — privacy is structural
 ### 3.1 `PublicComplaintView` — **no PII**
