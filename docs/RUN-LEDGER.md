@@ -7,12 +7,13 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 3 — S2.6 ✅ merged; S1.1 (design) running; S2.7 (services) dispatching.
+- **Active wave:** Wave 3 complete → **Wave 4 (Flutter UI)** next.
 - **Trunk:** `main` (agent branches `agent/<chunk-id>` cut from it).
-- **Baseline:** `campusfix_core` complete through logic layer — **394 tests green, analyze clean**
-  (enums, models, views, priority, status machine + validateTransition, assignment, privacy).
-- **Next action:** Wave 3 — S2.6 (mock repos + seed + directories) ‖ S1.1 (design foundations, Claude
-  Design). Then S2.7 (services) once S2.6 lands.
+- **Baseline:** **`campusfix_core` COMPLETE — 651 tests green, analyze clean** (models, 8 enums, views,
+  priority engine, status machine + validateTransition, assignment, privacy, mock repos + seed [29
+  complaints/25 users/226 notifs], ComplaintService + NotificationService). Design system published.
+- **Next action:** Wave 4 — S3.1 (Flutter theme/tokens from design-system.md). Then S3.2 (widgets),
+  then apps (S4 mobile / S5 admin). Before S3.2/S4: generate ~8 placeholder before/after sample assets.
 
 ## Ledger
 | Chunk | Status | Owner | Branch | Checkpoint commit | Notes |
@@ -32,7 +33,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S2.4 Assignment routing | ✅ | A | merged | 59677d1 | category→department + isManual; full table tests. |
 | S2.5 Privacy projections | ✅ | A | merged | d220f87 | public/admin views + PII-leak sweep + static architecture guard. |
 | S2.6 Repos + seed data | ✅ | A | merged | 43a42bf | 4 mock repos + AppNotification/User/Campus directories; seed = 29 complaints/25 users/226 notifs; +144 tests (538 total). |
-| S2.7 Services | 🟡 | A | agent/S2.7-services | | ComplaintService (transition executor) + NotificationService (Wave 3b). |
+| S2.7 Services | ✅ | A | merged | a0b4466 | ComplaintService (executor, per-complaint locking, INV-4/5, P4/N15) + NotificationService (canonical templates); +113 tests (651 total). |
 | S3.1 Theme & tokens | ⬜ | A | | | Flutter theme from S1.1. |
 | S3.2 Reusable widgets | ⬜ | A | | | Flutter widgets + gallery. |
 | S4.1 Mobile shell + auth | ⬜ | A | | | router+riverpod+mock login. |
@@ -75,7 +76,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 5 | 2026-10-06 | c3237b1 | S0.3 specs merged; open issues resolved (data-model §7); ARCHITECTURE fixes; S2.7 added. |
 | 6 | 2026-10-06 | b21d181 | Wave 2 integrated: priority/status/assignment/privacy merged, barrel wired, userId redacted, privacy-spec synced; 394 tests green. |
 | 7 | 2026-10-06 | 05ae5c6 | S2.6 merged: mock repos + seed (29 complaints) + directories; 538 tests green. |
-| 8 | 2026-10-06 | _this commit_ | S1.1 design foundations merged (design-system.md + published style-guide Artifact); 8 design decisions logged. |
+| 8 | 2026-10-06 | 8dcfb8b | S1.1 design foundations merged (design-system.md + published style-guide Artifact); 8 design decisions logged. |
+| 9 | 2026-10-06 | _this commit_ | S2.7 merged: ComplaintService + NotificationService; core layer COMPLETE at 651 tests. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
