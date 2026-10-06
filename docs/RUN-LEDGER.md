@@ -20,7 +20,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S0.1 Repo + docs | ✅ | O | main | 0ba9dfb | Repo, git, .gitignore, README, REQUIREMENTS, ARCHITECTURE, ORCHESTRATION, PLAN, RUN-LEDGER. |
 | S0.2 Flutter scaffold | ✅ | O | main | _this commit_ | 2 packages + 2 apps; Riverpod+go_router; path deps; analyze clean; admin web build ✓. |
 | S0.3 Detailed specs | ✅ | A | merged | fbf7ddb | 5 specs (priority/status/assignment/privacy/screens) merged; 14 open issues resolved by O (see data-model-spec §7). |
-| S1.1 Design foundations | 🟡 | A | agent/S1.1-design | | design-system.md contract + HTML style-guide Artifact (no Claude Design type on account → HTML artifact). |
+| S1.1 Design foundations | ✅ | A | merged | 5f1a7df | design-system.md (26 components, 200 contrast pairs ok, M3 mapping) + HTML style-guide Artifact (O visual-QA'd). URL below. |
 | S1.2 Core components | ⬜ | O/A | | | reusable component set. |
 | S1.3 Reporter screens | ⬜ | A | | | login→report→track→board→notifications. |
 | S1.4 Maintenance+verifier screens | ⬜ | A | | | assigned/work/after-repair/verify. |
@@ -32,7 +32,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S2.4 Assignment routing | ✅ | A | merged | 59677d1 | category→department + isManual; full table tests. |
 | S2.5 Privacy projections | ✅ | A | merged | d220f87 | public/admin views + PII-leak sweep + static architecture guard. |
 | S2.6 Repos + seed data | ✅ | A | merged | 43a42bf | 4 mock repos + AppNotification/User/Campus directories; seed = 29 complaints/25 users/226 notifs; +144 tests (538 total). |
-| S2.7 Services | ⬜ | A | | | ComplaintService (transition executor) + NotificationService. |
+| S2.7 Services | 🟡 | A | agent/S2.7-services | | ComplaintService (transition executor) + NotificationService (Wave 3b). |
 | S3.1 Theme & tokens | ⬜ | A | | | Flutter theme from S1.1. |
 | S3.2 Reusable widgets | ⬜ | A | | | Flutter widgets + gallery. |
 | S4.1 Mobile shell + auth | ⬜ | A | | | router+riverpod+mock login. |
@@ -49,6 +49,21 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S6.2 Walkthrough + cleanup | ⬜ | O | | | WALKTHROUGH.md + tidy. |
 | S6.3 Phase-2 Firebase plan | ⬜ | O | | | backend build plan. |
 
+## Design system
+- **Published Artifact (style guide):** https://claude.ai/artifact/X521FrUxyrBpwzuus8xUyQ ("CampusFix
+  Design System", private to the account). Source: `docs/design/design-system.html`.
+- **Token contract:** `docs/design/design-system.md` (petrol-teal primary; Archivo / Public Sans /
+  JetBrains Mono; semantic sets for 8 categories / 4 priorities / 7 statuses; M3 ColorScheme mapping).
+- **S1.1 design decisions (orchestrator verdicts on the 8 open questions):**
+  1. **Dark theme is in v1** (tokens specified + contrast-verified; near-free via Flutter ThemeData). Light is default/system-driven.
+  2. Brand = petrol-teal placeholder; a real college brand later swaps only `primary*` + `focusRing`.
+  3. Bottom-nav label **"Alerts"**; the screen title stays **"Notifications"**.
+  4. Need ~8 bundled sample before/after images — orchestrator provides placeholder assets for S3.2/S4.
+  5. Icons = Material `Icons.*_outlined` (no extra dependency).
+  6. Admin web is **desktop-first**; <1024px is a graceful fallback, not a requirement.
+  7. Rework (T7) is a timeline/stepper **marker**, not an 8th status (7 statuses stand).
+  8. No separate Claude Design project (account has no Design type) — the HTML Artifact is the deliverable.
+
 ## Checkpoint log
 | # | Date | Commit | What landed |
 |---|------|--------|-------------|
@@ -59,7 +74,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 4 | 2026-10-06 | 1570f7e | S2.1 integration + as-built notes. |
 | 5 | 2026-10-06 | c3237b1 | S0.3 specs merged; open issues resolved (data-model §7); ARCHITECTURE fixes; S2.7 added. |
 | 6 | 2026-10-06 | b21d181 | Wave 2 integrated: priority/status/assignment/privacy merged, barrel wired, userId redacted, privacy-spec synced; 394 tests green. |
-| 7 | 2026-10-06 | _this commit_ | S2.6 merged: mock repos + seed (29 complaints) + directories; 538 tests green. |
+| 7 | 2026-10-06 | 05ae5c6 | S2.6 merged: mock repos + seed (29 complaints) + directories; 538 tests green. |
+| 8 | 2026-10-06 | _this commit_ | S1.1 design foundations merged (design-system.md + published style-guide Artifact); 8 design decisions logged. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
