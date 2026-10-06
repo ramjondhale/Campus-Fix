@@ -1,5 +1,4 @@
 import 'package:campusfix_core/campusfix_core.dart';
-import 'package:campusfix_core/logic/assignment_router.dart';
 import 'package:test/test.dart';
 
 void main() {

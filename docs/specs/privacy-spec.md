@@ -30,7 +30,8 @@ identity), R6 (anonymous campus board), R10, R12 (admin).
 | **P3 — residual / free-text / media** | Not structured identity, but can self-identify. **Cannot be proven absent by tests**; mitigated by UX + Phase 2. | `Complaint.description`, `StatusEvent.note`, `Complaint.resolutionNote`, `Attachment.caption`, photo pixels, photo EXIF/GPS, `Attachment.ref` filenames |
 | **Non-PII** | Safe for every authenticated role. | `Complaint.id`, `category`, `building`, `floor`, `room`, `priority`/`priorityOverride`/`effectivePriority`, `status`, `createdAt`, `updatedAt`, `Attachment.id/kind/createdAt`, `assignment.department`, `assignment.isManual`, `assignment.assignedAt`, `StatusEvent.status/actorRole/at`, `severity`, `peopleAffected`, `safetyFlag` |
 
-`Complaint.title`: free text by the reporter (P3) — **not collected in v1** (`null`); not part of any view.
+`Complaint.title`: optional reporter free-text (P3 residual, same class as `description`). Per the
+final data-model §3.2 it **is** carried on both views (the report UI may leave it null/derived).
 
 ## 3. View projections
 
@@ -188,7 +189,7 @@ variants (parametrise over all `ProblemCategory` x `ComplaintStatus`).
 | ID | Assertion |
 |----|-----------|
 | **PR-T1** | **No-PII serialization:** `final s = jsonEncode(toPublicView(fixtureComplaint).toJson()).toLowerCase();` contains **none** of the sentinel fragments (`piiName`, `piiId`, `piiEmail`, `piiPhone`, `piiUid` and each fragment above, lower-cased). |
-| **PR-T2** | **Key allow-list (default deny):** `toPublicView(c).toJson().keys.toSet()` **equals exactly** `{id, category, building, floor, room, description, beforePhotos, afterPhotos, effectivePriority, status, createdAt, updatedAt}` (base, data-model §3.1) `∪ {timeline, resolutionNote, assignedDepartment}` once DM-1/DM-2 are adopted. Adding any field fails the test until a reviewer updates the allow-list. |
+| **PR-T2** | **Key allow-list (default deny):** `toPublicView(c).toJson().keys.toSet()` **equals exactly** the 17 keys of the final data-model §3.2: `{id, category, title, building, floor, room, description, beforePhotos, afterPhotos, effectivePriority, status, safetyFlag, assignedDepartment, resolutionNote, timeline, createdAt, updatedAt}`. Adding any field fails the test until a reviewer updates the allow-list. |
 | **PR-T3** | **Nested allow-lists:** each `Attachment` JSON in the public view has keys exactly `{id, kind, ref, caption, createdAt}`; each public timeline entry has keys exactly `{status, actorRole, note, at}` (no `id`, no `actorId`). |
 | **PR-T4** | **Admin gating (exhaustive over `UserRole.values`):** `toAdminView(c, requester)` is `null` for `reporter`, `maintenance`, `verifier`; non-null for `admin`. Includes the case `requester.id == c.reporter.userId` with `role == reporter` => `null`. Also `UserRole.canSeeReporterIdentity` is `true` for `admin` only. |
 | **PR-T5** | **Positive control (anti-vacuity):** for `admin`, `jsonEncode(toAdminView(c, admin).toJson())` **does** contain `piiName`, `piiEmail`, `piiUid`, `staffId`; and `adminView.reporter == c.reporter`. (Proves PR-T1's scanner can actually detect these strings.) |

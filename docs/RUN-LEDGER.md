@@ -7,10 +7,12 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 2 (core logic engines) — dispatching.
+- **Active wave:** Wave 2 complete → Wave 3 next.
 - **Trunk:** `main` (agent branches `agent/<chunk-id>` cut from it).
-- **Baseline:** scaffold builds; S2.1 core (73 tests) merged; all S0.3 specs merged + open issues resolved.
-- **Next action:** dispatch Wave 2 — S2.2 priority ‖ S2.3 status ‖ S2.4 assignment ‖ S2.5 privacy (4 worktrees).
+- **Baseline:** `campusfix_core` complete through logic layer — **394 tests green, analyze clean**
+  (enums, models, views, priority, status machine + validateTransition, assignment, privacy).
+- **Next action:** Wave 3 — S2.6 (mock repos + seed + directories) ‖ S1.1 (design foundations, Claude
+  Design). Then S2.7 (services) once S2.6 lands.
 
 ## Ledger
 | Chunk | Status | Owner | Branch | Checkpoint commit | Notes |
@@ -25,10 +27,10 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S1.5 Admin web screens | ⬜ | A | | | dashboard/list/manage. |
 | S1.6 Design→code handoff | ⬜ | A | | | component↔widget map. |
 | S2.1 Models & enums | ✅ | A | merged | 5c1b2bb | 8 enums, 6 models, id gen, 2 repo interfaces; 73 tests green (O-verified). As-built notes folded into data-model-spec. |
-| S2.2 Priority engine | ⬜ | A | | | rule-based + tests. |
-| S2.3 Status state machine | ⬜ | A | | | role-gated transitions + tests. |
-| S2.4 Assignment routing | ⬜ | A | | | category→department + tests. |
-| S2.5 Privacy projections | ⬜ | A | | | public/admin views + tests. |
+| S2.2 Priority engine | ✅ | A | merged | aca2b37 | rule-based; 22 golden + 960-input property tests. |
+| S2.3 Status state machine | ✅ | A | merged | 26ef78a | L1 matrix + validateTransition (P1–P9); exhaustive 196-tuple tests. |
+| S2.4 Assignment routing | ✅ | A | merged | 59677d1 | category→department + isManual; full table tests. |
+| S2.5 Privacy projections | ✅ | A | merged | d220f87 | public/admin views + PII-leak sweep + static architecture guard. |
 | S2.6 Repos + seed data | ⬜ | A | | | mock repos + ≥24 complaints + AppNotification/User/Campus directories. |
 | S2.7 Services | ⬜ | A | | | ComplaintService (transition executor) + NotificationService. |
 | S3.1 Theme & tokens | ⬜ | A | | | Flutter theme from S1.1. |
@@ -55,7 +57,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 2 | 2026-10-06 | 761b347 | S0.3 data-model spec (core contract). |
 | 3 | 2026-10-06 | 5c1b2bb | S2.1 campusfix_core models/enums/id-gen/repo-interfaces (73 tests). |
 | 4 | 2026-10-06 | 1570f7e | S2.1 integration + as-built notes. |
-| 5 | 2026-10-06 | _this commit_ | S0.3 specs merged; open issues resolved (data-model §7); ARCHITECTURE fixes; S2.7 added. |
+| 5 | 2026-10-06 | c3237b1 | S0.3 specs merged; open issues resolved (data-model §7); ARCHITECTURE fixes; S2.7 added. |
+| 6 | 2026-10-06 | _this commit_ | Wave 2 integrated: priority/status/assignment/privacy merged, barrel wired, userId redacted, privacy-spec synced; 394 tests green. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
@@ -65,3 +68,14 @@ _Last updated: 2026-10-06 — by orchestrator._
   boundary (DM-4); added `validateTransition` L2 guard (SM-OI-1); verify & close kept as two actions
   (verifier verifies, admin closes); new models AppNotification/User/Campus directories (S2.6) and
   ComplaintService/NotificationService (S2.7).
+- 2026-10-06 — Wave 2 carry-over notes (from agent reports; apply in later chunks):
+  - **S2.7 ComplaintService must:** derive `Assignment.isManual` from `routeToDepartment` (don't trust
+    the caller); ignore/reject `priorityOverride` from non-admins; enforce INV-5 (freeze priority on
+    resolved/verified/closed, unfreeze on T7 reject); perform the deferred P4 user-directory check
+    (assignee is a `maintenance` user of that department — the skipped N15); ensure true composite
+    atomicity (validate all steps before committing any).
+  - **S2.6 seed:** `test/support/fixtures.dart` `fullComplaint()` has an inconsistent `isManual` — make
+    seed data router-consistent; re-run privacy PR-T9 sweep over real seed; re-run the priority
+    recompute rules (§6) when seeding aged complaints.
+  - **S4 report flow:** add the report-submit controller path to privacy test `mobileReporterAllowList`
+    (PR-T14 architecture guard); it's the one allowed place to touch `ReporterIdentity` in mobile.

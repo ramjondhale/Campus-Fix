@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:campusfix_core/campusfix_core.dart';
-import 'package:campusfix_core/logic/priority_engine.dart';
 import 'package:test/test.dart';
 
 // -- Helpers -----------------------------------------------------------------

@@ -1,9 +1,4 @@
-// The direct logic import can be dropped once the barrel exports
-// `logic/status_machine.dart` (the orchestrator wires exports separately).
-// ignore_for_file: unnecessary_import
-
 import 'package:campusfix_core/campusfix_core.dart';
-import 'package:campusfix_core/logic/status_machine.dart';
 import 'package:test/test.dart';
 
 import '../support/fixtures.dart';

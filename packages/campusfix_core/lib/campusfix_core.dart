@@ -17,8 +17,15 @@ export 'models/app_user.dart';
 export 'models/assignment.dart';
 export 'models/attachment.dart';
 export 'models/complaint.dart';
+export 'models/complaint_views.dart';
 export 'models/reporter_identity.dart';
 export 'models/status_event.dart';
+
+// Domain logic (pure)
+export 'logic/assignment_router.dart';
+export 'logic/priority_engine.dart';
+export 'logic/privacy.dart';
+export 'logic/status_machine.dart';
 
 // Complaint ID generation
 export 'mock/id_generator.dart';

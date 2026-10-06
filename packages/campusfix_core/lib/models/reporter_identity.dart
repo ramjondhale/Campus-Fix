@@ -74,7 +74,8 @@ class ReporterIdentity {
   @override
   int get hashCode => Object.hash(userId, fullName, idNumber, email, phone);
 
-  /// Redacted: never prints name, ID number, email, or phone.
+  /// Fully redacted: never prints userId, name, ID number, email, or phone
+  /// (privacy-spec PR-T11 / LK-3).
   @override
-  String toString() => 'ReporterIdentity(userId: $userId, <redacted>)';
+  String toString() => 'ReporterIdentity(<redacted>)';
 }

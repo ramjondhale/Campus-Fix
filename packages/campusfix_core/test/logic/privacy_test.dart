@@ -1,13 +1,8 @@
 // Privacy projection tests - privacy-spec §8 (PR-T1 ... PR-T16).
-//
-// The two direct imports below are needed until the orchestrator re-exports
-// the new files from `campusfix_core.dart`; they can be dropped afterwards.
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:campusfix_core/campusfix_core.dart';
-import 'package:campusfix_core/logic/privacy.dart';
-import 'package:campusfix_core/models/complaint_views.dart';
 import 'package:test/test.dart';
 
 import '../support/fixtures.dart' as fx;
@@ -817,18 +812,9 @@ void main() {
       }
     });
 
-    test(
-      'ReporterIdentity.toString hides the userId (P1)',
-      () {
-        expect(sentinelReporter.toString(), isNot(contains(piiUid)));
-      },
-      skip:
-          'KNOWN GAP (outside S2.5 scope - models are frozen): '
-          'ReporterIdentity.toString() currently prints userId '
-          '("ReporterIdentity(userId: ..., <redacted>)"). privacy-spec LK-3 '
-          'wants a fully redacted constant. Fix in a models follow-up, then '
-          'remove this skip.',
-    );
+    test('ReporterIdentity.toString hides the userId (P1)', () {
+      expect(sentinelReporter.toString(), isNot(contains(piiUid)));
+    });
 
     test('Complaint.toString contains no sentinel', () {
       expect(leaksIn(c.toString()), isEmpty);
