@@ -19,6 +19,24 @@ class _FakeComplaintRepository implements ComplaintRepository {
   Future<Complaint?> byId(String id) async => _store[id];
 
   @override
+  Future<List<Complaint>> byReporter(String userId) async => [
+    for (final c in _store.values)
+      if (c.reporter.userId == userId) c,
+  ];
+
+  @override
+  Future<List<Complaint>> byDepartment(Department department) async => [
+    for (final c in _store.values)
+      if (c.assignment?.department == department) c,
+  ];
+
+  @override
+  Future<List<Complaint>> byStatus(ComplaintStatus status) async => [
+    for (final c in _store.values)
+      if (c.status == status) c,
+  ];
+
+  @override
   Future<Complaint> submit(Complaint draft) async {
     _store[draft.id] = draft;
     _controller.add(_store.values.toList());
