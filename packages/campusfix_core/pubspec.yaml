@@ -1,0 +1,17 @@
+name: campusfix_core
+description: CampusFix AI shared domain models, enums, business logic, and mock data (pure Dart).
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.11.1
+
+# Constraints kept compatible with the Flutter SDK (flutter_test pins meta 1.17.0),
+# so this pure-Dart package can be consumed by the Flutter apps/packages.
+dependencies:
+  collection: ^1.18.0
+  meta: ^1.15.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

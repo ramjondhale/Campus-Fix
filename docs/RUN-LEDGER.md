@@ -7,15 +7,16 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 0 (foundation).
-- **Integration branch:** `main` (→ `integration` cut after S0.2).
-- **Next action:** S0.2 — Flutter monorepo scaffold.
+- **Active wave:** Wave 1 (specs + core models) — ready to dispatch.
+- **Trunk:** `main` (agent branches `agent/<chunk-id>` cut from it).
+- **Baseline:** scaffold builds — core/design/mobile/admin analyze clean; admin web build ✓.
+- **Next action:** dispatch Wave 1 — S0.3 (specs) ‖ S2.1 (models & enums).
 
 ## Ledger
 | Chunk | Status | Owner | Branch | Checkpoint commit | Notes |
 |-------|--------|-------|--------|-------------------|-------|
-| S0.1 Repo + docs | ✅ | O | main | _pending commit_ | Repo, git, .gitignore, README, REQUIREMENTS, ARCHITECTURE, ORCHESTRATION, PLAN, RUN-LEDGER. |
-| S0.2 Flutter scaffold | ⬜ | O | main | | 2 packages + 2 apps, path deps, baseline builds. |
+| S0.1 Repo + docs | ✅ | O | main | 0ba9dfb | Repo, git, .gitignore, README, REQUIREMENTS, ARCHITECTURE, ORCHESTRATION, PLAN, RUN-LEDGER. |
+| S0.2 Flutter scaffold | ✅ | O | main | _this commit_ | 2 packages + 2 apps; Riverpod+go_router; path deps; analyze clean; admin web build ✓. |
 | S0.3 Detailed specs | ⬜ | A | | | data-model, priority, status, assignment, privacy, screens. |
 | S1.1 Design foundations | ⬜ | O/A | | | tokens + Claude Design project. |
 | S1.2 Core components | ⬜ | O/A | | | reusable component set. |
@@ -48,7 +49,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 ## Checkpoint log
 | # | Date | Commit | What landed |
 |---|------|--------|-------------|
-| 0 | 2026-10-06 | _pending_ | S0.1 foundation. |
+| 0 | 2026-10-06 | 0ba9dfb | S0.1 foundation (docs, plan, ledger). |
+| 1 | 2026-10-06 | _this commit_ | S0.2 Flutter scaffold (2 pkgs + 2 apps, deps wired, baseline builds). |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

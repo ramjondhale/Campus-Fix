@@ -25,15 +25,16 @@ implementation, exploration, and analysis onto cheaper Sonnet agents.
    remove its worktree.
 
 ## Branch & worktree model
-- Integration branch: **`integration`** (cut from `main` after scaffold). All verified work lands here.
-- `main` holds only verified checkpoints the orchestrator promotes from `integration`.
+- Trunk (the orchestrator's integration branch): **`main`**. All verified work lands here; every
+  commit on `main` is a checkpoint.
 - Each agent chunk gets a branch **`agent/<chunk-id>`** in a git worktree under
-  `../campusfix-worktrees/<chunk-id>` (sibling dir, not committed).
+  `../campusfix-worktrees/<chunk-id>` (sibling dir, not committed), cut from the current `main`.
 - Flow per chunk:
-  1. Orchestrator creates worktree+branch off `integration`.
+  1. Orchestrator creates worktree + branch `agent/<chunk-id>` off `main`.
   2. Agent implements in that worktree, runs allowed static checks, commits on its branch.
-  3. Orchestrator merges `agent/<chunk-id>` → `integration`, resolves conflicts, **builds/verifies**.
-  4. Orchestrator updates `RUN-LEDGER.md`, commits the checkpoint, deletes branch + worktree.
+  3. Orchestrator merges `agent/<chunk-id>` → `main`, resolves conflicts, **builds/verifies**.
+  4. Orchestrator updates `RUN-LEDGER.md`, commits the checkpoint, removes the worktree + deletes the
+     branch.
 
 > Note: Sonnet agents dispatched via the `Agent` tool share this repo's working tree by default. To
 > honor rules 2–3 and avoid clobbering, the orchestrator assigns each parallel agent a **disjoint set
