@@ -1,0 +1,42 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+.pub-cache/
+.pub/
+coverage/
+*.iml
+*.ipr
+*.iws
+
+# Flutter generated
+**/generated_plugin_registrant.dart
+app.*.symbols
+app.*.map.json
+
+# IDE
+.idea/
+.vscode/
+*.log
+
+# macOS
+.DS_Store
+
+# iOS / Android build junk (prototype scope keeps native dirs minimal)
+ios/Flutter/Flutter.framework/
+ios/Pods/
+android/.gradle/
+android/local.properties
+
+# Firebase (added at backend phase — never commit secrets)
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+.firebase/
+*.env
+
+# Agent scratch (local only)
+.agent/scratch/
