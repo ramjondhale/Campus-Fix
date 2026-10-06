@@ -7,7 +7,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 3 complete → **Wave 4 (Flutter UI)** next.
+- **Active wave:** Wave 4 (Flutter UI) — S3.1 theme ✅ merged; S3.2 widgets next.
 - **Trunk:** `main` (agent branches `agent/<chunk-id>` cut from it).
 - **Baseline:** **`campusfix_core` COMPLETE — 651 tests green, analyze clean** (models, 8 enums, views,
   priority engine, status machine + validateTransition, assignment, privacy, mock repos + seed [29
@@ -34,7 +34,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S2.5 Privacy projections | ✅ | A | merged | d220f87 | public/admin views + PII-leak sweep + static architecture guard. |
 | S2.6 Repos + seed data | ✅ | A | merged | 43a42bf | 4 mock repos + AppNotification/User/Campus directories; seed = 29 complaints/25 users/226 notifs; +144 tests (538 total). |
 | S2.7 Services | ✅ | A | merged | a0b4466 | ComplaintService (executor, per-complaint locking, INV-4/5, P4/N15) + NotificationService (canonical templates); +113 tests (651 total). |
-| S3.1 Theme & tokens | ⬜ | A | | | Flutter theme from S1.1. |
+| S3.1 Theme & tokens | ✅ | A | merged | 62603b0 | token classes, google_fonts typography, 4 ThemeExtensions, AppTheme light/dark + component themes + context helpers; 66 tests, analyze clean. |
 | S3.2 Reusable widgets | ⬜ | A | | | Flutter widgets + gallery. |
 | S4.1 Mobile shell + auth | ⬜ | A | | | router+riverpod+mock login. |
 | S4.2 Report-a-Problem flow | ⬜ | A | | | full submission flow. |
@@ -85,7 +85,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 6 | 2026-10-06 | b21d181 | Wave 2 integrated: priority/status/assignment/privacy merged, barrel wired, userId redacted, privacy-spec synced; 394 tests green. |
 | 7 | 2026-10-06 | 05ae5c6 | S2.6 merged: mock repos + seed (29 complaints) + directories; 538 tests green. |
 | 8 | 2026-10-06 | 8dcfb8b | S1.1 design foundations merged (design-system.md + published style-guide Artifact); 8 design decisions logged. |
-| 9 | 2026-10-06 | _this commit_ | S2.7 merged: ComplaintService + NotificationService; core layer COMPLETE at 651 tests. |
+| 9 | 2026-10-06 | 4d9cafa | S2.7 merged: ComplaintService + NotificationService; core layer COMPLETE at 651 tests. |
+| 10 | 2026-10-06 | _this commit_ | S3.1 merged: Flutter theme (tokens, typography, ThemeExtensions, AppTheme light/dark); 66 tests. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
