@@ -7,7 +7,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 2 complete → Wave 3 next.
+- **Active wave:** Wave 3 — S2.6 ✅ merged; S1.1 (design) running; S2.7 (services) dispatching.
 - **Trunk:** `main` (agent branches `agent/<chunk-id>` cut from it).
 - **Baseline:** `campusfix_core` complete through logic layer — **394 tests green, analyze clean**
   (enums, models, views, priority, status machine + validateTransition, assignment, privacy).
@@ -20,7 +20,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S0.1 Repo + docs | ✅ | O | main | 0ba9dfb | Repo, git, .gitignore, README, REQUIREMENTS, ARCHITECTURE, ORCHESTRATION, PLAN, RUN-LEDGER. |
 | S0.2 Flutter scaffold | ✅ | O | main | _this commit_ | 2 packages + 2 apps; Riverpod+go_router; path deps; analyze clean; admin web build ✓. |
 | S0.3 Detailed specs | ✅ | A | merged | fbf7ddb | 5 specs (priority/status/assignment/privacy/screens) merged; 14 open issues resolved by O (see data-model-spec §7). |
-| S1.1 Design foundations | ⬜ | O/A | | | tokens + Claude Design project. |
+| S1.1 Design foundations | 🟡 | A | agent/S1.1-design | | design-system.md contract + HTML style-guide Artifact (no Claude Design type on account → HTML artifact). |
 | S1.2 Core components | ⬜ | O/A | | | reusable component set. |
 | S1.3 Reporter screens | ⬜ | A | | | login→report→track→board→notifications. |
 | S1.4 Maintenance+verifier screens | ⬜ | A | | | assigned/work/after-repair/verify. |
@@ -31,7 +31,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S2.3 Status state machine | ✅ | A | merged | 26ef78a | L1 matrix + validateTransition (P1–P9); exhaustive 196-tuple tests. |
 | S2.4 Assignment routing | ✅ | A | merged | 59677d1 | category→department + isManual; full table tests. |
 | S2.5 Privacy projections | ✅ | A | merged | d220f87 | public/admin views + PII-leak sweep + static architecture guard. |
-| S2.6 Repos + seed data | ⬜ | A | | | mock repos + ≥24 complaints + AppNotification/User/Campus directories. |
+| S2.6 Repos + seed data | ✅ | A | merged | 43a42bf | 4 mock repos + AppNotification/User/Campus directories; seed = 29 complaints/25 users/226 notifs; +144 tests (538 total). |
 | S2.7 Services | ⬜ | A | | | ComplaintService (transition executor) + NotificationService. |
 | S3.1 Theme & tokens | ⬜ | A | | | Flutter theme from S1.1. |
 | S3.2 Reusable widgets | ⬜ | A | | | Flutter widgets + gallery. |
@@ -58,7 +58,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 3 | 2026-10-06 | 5c1b2bb | S2.1 campusfix_core models/enums/id-gen/repo-interfaces (73 tests). |
 | 4 | 2026-10-06 | 1570f7e | S2.1 integration + as-built notes. |
 | 5 | 2026-10-06 | c3237b1 | S0.3 specs merged; open issues resolved (data-model §7); ARCHITECTURE fixes; S2.7 added. |
-| 6 | 2026-10-06 | _this commit_ | Wave 2 integrated: priority/status/assignment/privacy merged, barrel wired, userId redacted, privacy-spec synced; 394 tests green. |
+| 6 | 2026-10-06 | b21d181 | Wave 2 integrated: priority/status/assignment/privacy merged, barrel wired, userId redacted, privacy-spec synced; 394 tests green. |
+| 7 | 2026-10-06 | _this commit_ | S2.6 merged: mock repos + seed (29 complaints) + directories; 538 tests green. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
