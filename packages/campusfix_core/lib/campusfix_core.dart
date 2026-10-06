@@ -36,6 +36,10 @@ export 'repositories/complaint_repository.dart';
 export 'repositories/notification_repository.dart';
 export 'repositories/user_repository.dart';
 
+// Services: the L3 transition executor and in-app notifications.
+export 'services/complaint_service.dart';
+export 'services/notification_service.dart';
+
 // Mock layer: Complaint ID generation, campus directory, in-memory
 // repositories and seed data (prototype only; Phase 2 swaps in Firebase).
 export 'mock/campus_directory.dart';

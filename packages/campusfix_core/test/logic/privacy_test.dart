@@ -1100,14 +1100,137 @@ void main() {
     });
   });
 
-  group('PR-T15 notification derivation (S4.4)', () {
-    test(
-      'every seed StatusEvent yields a PII-free templated message',
-      () {},
-      skip:
-          'Deferred: NotificationService / seed data land in S2.6-S2.7/S4.4. '
-          'Re-run PR-T9 fragments over the generated messages there.',
-    );
+  group('PR-T15 notification derivation (S2.7)', () {
+    // The generated messages of NotificationService / NotificationTemplates
+    // (the canonical §5.1 templates), run over the real seed timelines.
+    final seed = SeedData.build();
+
+    /// Every identity string of the seed (reporters, staff) plus the
+    /// privacy-spec sentinels - the PR-T9 fragment set.
+    final fragments = <String>[
+      for (final c in seed.complaints) ...[
+        c.reporter.userId,
+        c.reporter.fullName,
+        c.reporter.idNumber,
+        c.reporter.email,
+        ?c.reporter.phone,
+        ...c.reporter.fullName.split(' ').where((t) => t.length >= 4),
+      ],
+      for (final u in seed.users) ...[
+        u.id,
+        u.displayName,
+        u.idNumber,
+        u.email,
+        ...u.displayName.split(' ').where((t) => t.length >= 4),
+      ],
+      ...sentinelFragments,
+    ];
+
+    /// Every message the templates can produce for [event], which is
+    /// timeline entry [i] of [c]. The timeline stores no departments, so each
+    /// possible (new, previous) department pair is rendered.
+    List<NotificationDraft> renderings(Complaint c, int i) {
+      final event = c.timeline[i];
+      final trigger = NotificationTemplates.triggerFor(
+        i == 0 ? null : c.timeline[i - 1].status,
+        event.status,
+      );
+      expect(trigger, isNotNull, reason: '${c.id} event $i is not notifying');
+      final assignment = c.assignment;
+      return [
+        for (final d in Department.values)
+          for (final previous in <Department?>[null, ...Department.values])
+            ...NotificationTemplates.plan(
+              trigger!,
+              assignment == null
+                  ? c
+                  : c.copyWith(assignment: assignment.copyWith(department: d)),
+              previousDepartment: previous,
+              note: event.note,
+            ),
+      ];
+    }
+
+    test('every seed StatusEvent yields a PII-free templated message', () {
+      expect(fragments.toSet().length, greaterThan(100)); // anti-vacuity
+      var events = 0;
+      var messages = 0;
+      for (final c in seed.complaints) {
+        for (var i = 0; i < c.timeline.length; i++) {
+          final drafts = renderings(c, i);
+          expect(drafts, isNotEmpty, reason: '${c.id} event $i');
+          for (final d in drafts) {
+            expect(
+              leaksIn('${d.title}\n${d.body}', fragments),
+              isEmpty,
+              reason: '${c.id} event $i: ${d.body}',
+            );
+            expect(d.body, contains(c.id), reason: '${c.id} event $i');
+            messages++;
+          }
+          events++;
+        }
+      }
+      expect(events, greaterThan(100));
+      expect(messages, greaterThan(events));
+    });
+
+    test('the generated messages match the seeded notifications (§5.1)', () {
+      // Every notification the seed emitted for a complaint is one the
+      // templates produce for one of its events - same type, title and body.
+      final byId = {for (final c in seed.complaints) c.id: c};
+      final templated = <String, Set<String>>{};
+      for (final c in seed.complaints) {
+        templated[c.id] = {
+          for (var i = 0; i < c.timeline.length; i++)
+            for (final d in renderings(c, i))
+              '${d.type.name}|${d.title}|${d.body}',
+        };
+      }
+      expect(seed.notifications, isNotEmpty);
+      for (final n in seed.notifications) {
+        expect(byId, contains(n.complaintId));
+        expect(
+          templated[n.complaintId],
+          contains('${n.type.name}|${n.title}|${n.body}'),
+          reason: '${n.id}: ${n.body}',
+        );
+      }
+    });
+
+    test('the owner message of every event is the one the seed sent', () {
+      // Conversely: at the instant of each event the owner received the
+      // templated owner message(s) of that event.
+      for (final c in seed.complaints) {
+        for (var i = 0; i < c.timeline.length; i++) {
+          final event = c.timeline[i];
+          final sent = {
+            for (final n in seed.notifications)
+              if (n.complaintId == c.id &&
+                  n.recipientId == c.reporter.userId &&
+                  n.createdAt == event.at)
+                '${n.type.name}|${n.title}|${n.body}',
+          };
+          final expected = {
+            for (final d in renderings(c, i))
+              if (d.audience == NotificationAudience.owner)
+                '${d.type.name}|${d.title}|${d.body}',
+          };
+          expect(expected, isNotEmpty, reason: '${c.id} event $i');
+          expect(
+            sent.intersection(expected),
+            isNotEmpty,
+            reason: '${c.id} event $i (${event.status.name})',
+          );
+        }
+      }
+    });
+
+    test('positive control: a leaky rendering would be caught', () {
+      final c = seed.complaints.first;
+      final leaky = '${c.id} reassigned to ${c.reporter.fullName}.';
+      expect(leaksIn(leaky, fragments), isNotEmpty);
+    });
   });
 
   group('PR-T16 screen-level (widget tests)', () {
