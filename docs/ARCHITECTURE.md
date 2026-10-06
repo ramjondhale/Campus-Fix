@@ -45,8 +45,11 @@ Packages are wired with path dependencies (no melos needed at this size).
 |------|-----|---------------------------|-------------|
 | Reporter (student/staff) | mobile | own complaints only | submit, track own, view board (anon) |
 | Maintenance staff | mobile | **no** | see assigned (anon), start/progress, upload after-repair photo+note |
-| Verifier / Management | mobile + admin | **no** on board; audit-gated in admin | verify resolution, close |
-| Admin | admin web | **yes** (audit-gated) | assign, change priority/status, view all, dashboard |
+| Verifier / Management | mobile + limited admin web | **no** (identity is admin-only) | verify resolution |
+| Admin | admin web | **yes** (audit-gated, Phase 2) | assign, change priority/status, close, view all, dashboard |
+
+> `admin` is a superset of `verifier` powers (one person can hold both — assumption A2). Only `admin`
+> can see reporter identity (`UserRole.canSeeReporterIdentity`).
 
 ## 5. Privacy architecture (R5/R6) — the load-bearing constraint
 - `Complaint` (core) holds `reporterId` + `ReporterIdentity` (PII).
@@ -58,7 +61,7 @@ Packages are wired with path dependencies (no melos needed at this size).
   with unit tests proving PII never leaks into a public view.
 
 ## 6. Priority engine (R7) — rule-based, pluggable
-Pure function `computePriority(ComplaintSignals) → Priority`. Weighted factors: safety flag (hard
+Pure function `computePriority(PriorityInputs) → Priority`. Weighted factors: safety flag (hard
 override to Critical/High), category base weight, reporter-rated severity, people affected, location
 sensitivity, waiting time (aging escalation). Fully specified in `specs/priority-engine-spec.md`.
 AI/ML (R15) can later replace the scorer behind the same interface.
@@ -70,7 +73,8 @@ A pure `StatusMachine.canTransition(from, to, role)` with tests. Each transition
 `StatusEvent` to the complaint timeline (who/when/note — "who" stored but privacy-filtered on display).
 
 ## 8. Assignment routing (R8)
-`routeToDepartment(Category) → Department` pure map, with manual override supported in admin. Spec in
+`routeToDepartment(Category) → Department?` pure map (null = manual triage for safety/other), with
+manual override supported in admin. Spec in
 `specs/assignment-routing-spec.md`.
 
 ## 9. Firebase mapping (Phase 2 — not built yet)

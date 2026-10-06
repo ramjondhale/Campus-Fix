@@ -33,7 +33,8 @@ finish independently. IDs are stable and referenced by the run ledger.
 | S2.3 | Status state machine | S2.1, S0.3 | `StatusMachine.canTransition/next()` role-gated + tests covering legal/illegal transitions. |
 | S2.4 | Assignment routing | S2.1, S0.3 | `routeToDepartment()` + manual-override model + tests. |
 | S2.5 | Privacy projections | S2.1, S0.3 | `PublicComplaintView`, `AdminComplaintView`, `toPublicView/toAdminView` + tests proving no PII in public view. |
-| S2.6 | Repos + seed data | S2.1–2.5 | Repository interfaces + in-memory mock impls + realistic seed data (≥24 complaints spanning all categories/priorities/statuses, with before/after samples). |
+| S2.6 | Repos + seed data | S2.1–2.5 | Mock repo impls (+ `byReporter`/`byDepartment` queries), `AppNotification` model + `NotificationRepository`, user directory (`UserRepository`) and `CampusDirectory` (buildings→floors→rooms); realistic seed data (≥24 complaints spanning all categories/priorities/statuses, with before/after samples, users, notifications). |
+| S2.7 | Services | S2.2–2.6 | `ComplaintService` (atomic transition executor: validate→apply→append StatusEvent→recompute/freeze priority→persist) + `NotificationService` (generate/serve in-app notifications). Tests. |
 
 ## S3 — Design system package `campusfix_design` (Owner: A — Flutter code)
 | ID | Chunk | Deps | Deliverable / acceptance |
@@ -75,7 +76,7 @@ finish independently. IDs are stable and referenced by the run ledger.
 - **Wave 1 (≤2 A):** S0.3 specs (A) ‖ S2.1 models+enums (A). *(S2.1 is the spine — unblocks S2.2–2.6.)*
   - O reviews specs, merges & verifies models.
 - **Wave 2 (≤4 A):** S2.2 priority ‖ S2.3 status ‖ S2.4 assignment ‖ S2.5 privacy (all depend only on S2.1 + specs; disjoint files). O merges + runs `dart test` after each.
-- **Wave 3 (≤2):** S2.6 repos+seed (A) ‖ S1.1 design foundations (O-driven in Claude Design, A may draft tokens doc).
+- **Wave 3 (≤2):** S2.6 repos+seed+directories (A) ‖ S1.1 design foundations (Claude Design; A drafts tokens doc). Then **S2.7 services** (A) once S2.6 lands.
 - **Wave 4 (≤2):** S3.1 theme/tokens (A) ‖ S1.2 components design. O builds design package.
 - **Wave 5 (≤2):** S3.2 widgets (A) ‖ S1.3–1.5 screen designs (A drafts, O curates in Claude Design).
 - **Wave 6 (≤4):** S4.1 shell → then S4.2 ‖ S4.3 ‖ S4.4 (disjoint feature dirs). O builds mobile between merges.

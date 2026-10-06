@@ -113,22 +113,41 @@ Helpers: `effectivePriority` (`priorityOverride ?? priority`), `Duration waiting
 >   (`nextComplaintId(DateTime)`, year-scoped counter, caps at 99999 → throws).
 
 ## 3. View projections (R5/R6) — privacy is structural
-### 3.1 `PublicComplaintView` — **no PII**
-Fields: `id`, `category`, `building`, `floor`, `room`, `description`, `beforePhotos`, `afterPhotos`,
-`effectivePriority`, `status`, `createdAt`, `updatedAt`. Used by the board, lists, and all
-maintenance/verifier screens.
+> Resolves gaps DM-1/DM-2/DM-3 raised during S0.3. PII = reporter name/email/idNumber/phone **and**
+> any actor's name/id in the timeline. Everything below is non-PII and safe for authenticated users.
 
-### 3.2 `AdminComplaintView`
-All of `PublicComplaintView` **plus** `reporter`, `assignment`, full `timeline` (with actor), and
-`resolutionNote`. Only materializes when the requester is `admin`.
+### 3.1 `PublicStatusEvent` — timeline entry without actor identity
+Fields: `status: ComplaintStatus`, `actorRole: UserRole`, `note: String?`, `at: DateTime`.
+(Projection of `StatusEvent` dropping `id` and `actorId`.)
 
-### 3.3 Projection functions (in `logic/privacy.dart`)
+### 3.2 `PublicComplaintView` — **no PII** (board, lists, maintenance & verifier screens)
+Fields: `id`, `category`, `title`, `building`, `floor`, `room`, `description`, `beforePhotos`,
+`afterPhotos`, `effectivePriority`, `status`, `safetyFlag`, `assignedDepartment: Department?`,
+`resolutionNote: String?`, `timeline: List<PublicStatusEvent>`, `createdAt`, `updatedAt`.
+> The **Board** (R6) renders only a subset (id, category, location, a photo, description, priority,
+> date/time, status) — it does not show the timeline, resolution note, or assigned department. That is
+> a screen-level choice; the fields are safe to carry on the view either way.
+
+### 3.3 `AdminComplaintView` — full, admin-gated
+All of `PublicComplaintView` **plus** `reporter` (PII), `severity`, `peopleAffected`, `priority`,
+`priorityOverride`, `assignment` (full: `assigneeId`, `assignedBy`, `isManual`…), and the full
+`timeline: List<StatusEvent>` (with actor id/role). Only materializes when `requester.role == admin`.
+
+### 3.4 Projection functions (in `logic/privacy.dart`)
 ```dart
 PublicComplaintView toPublicView(Complaint c);
+List<PublicComplaintView> toPublicViews(Iterable<Complaint> cs);
 AdminComplaintView? toAdminView(Complaint c, AppUser requester); // null unless requester.role == admin
 ```
-**Invariant (unit-tested):** `PublicComplaintView` has no field that can carry reporter name, email,
-ID, or phone. A test asserts the serialized public view contains none of the reporter's PII strings.
+**Invariant (unit-tested):** `PublicComplaintView` (and its serialized form) can carry no reporter
+PII and no actor identity. Tests use sentinel PII values and assert they never appear in any public
+projection (see `privacy-spec.md` PR-T1…PR-T16).
+
+### 3.5 Privacy boundary rule (resolves DM-4)
+`ComplaintRepository` is the data layer and returns raw `Complaint` (with PII) — it is the "backend".
+**Raw `Complaint` must never reach a widget.** A Riverpod provider layer (built in S4.1/S5.1) maps repo
+output → `PublicComplaintView` / `AdminComplaintView` based on the current user, and UI consumes only
+views. In Phase 2, Firestore Security Rules enforce the same server-side.
 
 ## 4. Complaint ID generation
 Format `CF-<year>-<5-digit zero-padded sequence>`, e.g. `CF-2026-00042`. In the mock layer a
@@ -141,11 +160,27 @@ Priority computePriority(PriorityInputs inputs);
 class PriorityInputs { ProblemCategory category; bool safetyFlag; Severity severity;
   PeopleAffected peopleAffected; Duration waitingTime; /* locationSensitivity optional */ }
 
-// S2.3 status-machine
+// S2.3 status-machine — L1 (pure edge+role legality)
 abstract class StatusMachine {
   static bool canTransition(ComplaintStatus from, ComplaintStatus to, UserRole role);
   static List<ComplaintStatus> nextStatuses(ComplaintStatus from, UserRole role);
+  // L2 (preconditions P1–P9 over the actual complaint) — resolves SM-OI-1.
+  // Pure; calls canTransition internally. Returns ok + the unmet blockers (never throws).
+  static ValidationResult validateTransition(
+      Complaint c, ComplaintStatus to, AppUser actor, TransitionRequest req);
 }
+class TransitionRequest {            // what the caller supplies for a transition attempt
+  ComplaintStatus expectedFrom;      // stale-guard (P8)
+  String? note;                      // reject/reassign reason, etc.
+  String? resolutionNote;            // T4
+  List<Attachment> afterPhotos;      // T4 (kind == afterPhoto)
+  Assignment? assignment;            // T2/T8
+  Priority? priorityOverride;        // admin at review (set) / clear handled separately
+}
+class ValidationResult { bool get ok; List<TransitionBlocker> blockers; }
+class TransitionBlocker { String code; /* e.g. "P1" */ String message; }
+// Note: the atomic *executor* (apply transition → append StatusEvent → recompute/freeze priority →
+// persist) lives in ComplaintService (chunk S2.7), not in StatusMachine.
 
 // S2.4 assignment-router
 Department? routeToDepartment(ProblemCategory category); // null => manual triage
@@ -176,3 +211,25 @@ campusfix_core/lib/
   mock/mock_complaint_repository.dart mock_auth_repository.dart seed_data.dart id_generator.dart
 campusfix_core/test/…        # mirrors lib/ ; every enum/model/logic file has a test
 ```
+
+## 7. Resolved decisions (orchestrator verdicts on S0.3 open issues)
+These are binding. Agents implement to these.
+
+| Ref | Decision |
+|-----|----------|
+| DM-1 | **Accepted.** `PublicComplaintView` carries a `timeline` of `PublicStatusEvent` (no actor identity). §3.1/§3.2. |
+| DM-2 | **Accepted.** `resolutionNote` + `assignedDepartment` added to `PublicComplaintView` (verifier/maintenance/reporter need them; neither is PII). |
+| DM-3 | **Accepted.** `AdminComplaintView` adds `title`, `severity`, `peopleAffected`, `priority`, `priorityOverride`, full `assignment`, and actor-bearing `timeline`. §3.3. |
+| DM-4 | **Accepted (provider-boundary form).** Repo returns raw `Complaint`; a provider layer projects to views; raw complaints never reach widgets. §3.5. Extra repo queries (`byReporter`, `byDepartment`) land in S2.6. |
+| SM-OI-1 | **Resolved.** Added `StatusMachine.validateTransition(Complaint, to, AppUser, TransitionRequest) → ValidationResult` (L2). `canTransition` stays pure L1. §5. |
+| SM-OI-2 | **Deferred.** v1 uses annotation events for reassign-in-`assigned` (no `eventKind` field). Revisit if management timelines need categorization. |
+| SM-OI-3 | **Accepted.** No `system` role; auto-route event attributed to the reviewing human with `Assignment.isManual == false`. |
+| SM-OI-4 | **Accepted.** `admin` is a superset of `verifier` powers (one admin user covers A2). |
+| SM-OI-5 | **Deferred to Phase 2.** Separation of duties (resolver ≠ verifier) not enforced in v1 (A2 small-college). |
+| PE-OI-1 | **Fixed.** `ARCHITECTURE.md` §6 now says `PriorityInputs`. |
+| PE-OI-2 | **Resolved.** Keep both: `Priority.weight` (4…1) for scoring/comparison; `Priority.rank` (0…3) for ascending "most-urgent-first" sort. Consistency asserted in tests. |
+| PE-OI-3 | **Deferred.** `locationSensitivity` not scored in v1; the optional field/comment stays for R15. |
+| PE-OI-4 | **Confirmed.** `category == safety` implies a safety floor even if the flag is unset; the report UI forces the flag on for that category. |
+| UI-verify/close | **Override of the S0.3 UI composite.** Keep `verified`→`closed` as two user actions: the **mobile verifier** only *verifies* (complaint rests in `verified`), the **admin web** *closes*. Preserves a visible `verified` state (R9's 7 stages). State machine unchanged (T5/T6 already separate). |
+| New models (S2.6) | `AppNotification` + `NotificationRepository`; a user directory (`UserRepository`/`UserDirectory`) to resolve actor/assignee names for admin views; `CampusDirectory` (buildings→floors→rooms) for the report form. |
+| New service (S2.7) | `ComplaintService` (transition executor per status-machine L3) + `NotificationService` (generate/serve in-app notifications). |
