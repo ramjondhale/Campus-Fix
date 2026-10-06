@@ -25,6 +25,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # The widgets use the built-in Material icon font (`Icons.*`).
+  uses-material-design: true
 
   # To add assets to your package, add an assets section, like this:
   # assets:
