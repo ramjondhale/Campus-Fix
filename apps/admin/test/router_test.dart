@@ -1,3 +1,4 @@
+import 'package:campusfix_admin/features/complaints/complaint_list_screen.dart';
 import 'package:campusfix_admin/features/errors/error_screens.dart';
 import 'package:campusfix_admin/providers/providers.dart';
 import 'package:campusfix_admin/router/app_router.dart';
@@ -212,21 +213,18 @@ void main() {
       await signInAs(tester, role);
 
       final String id = testSeed.complaints.first.id;
-      for (final (String path, String body) in <(String, String)>[
-        (AppRoutes.dashboard, 'Status breakdown'),
-        (
-          AppRoutes.complaints,
-          'The complaint list arrives in a later release.',
-        ),
+      for (final (String path, Finder body) in <(String, Finder)>[
+        (AppRoutes.dashboard, find.text('Status breakdown')),
+        (AppRoutes.complaints, find.byType(ComplaintListScreen)),
         (
           AppRoutes.complaint(id),
-          'Complaint details arrives in a later release.',
+          find.text('Complaint details arrives in a later release.'),
         ),
       ]) {
         router.go(path);
         await tester.pumpAndSettle();
         expect(router.state.uri.path, path, reason: '$role $path');
-        expect(find.text(body), findsOneWidget, reason: '$role $path');
+        expect(body, findsOneWidget, reason: '$role $path');
         expect(find.byType(AdminSideNav), findsOneWidget);
         expect(find.text(_forbiddenTitle), findsNothing);
       }
