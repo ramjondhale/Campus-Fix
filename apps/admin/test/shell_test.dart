@@ -55,10 +55,7 @@ void main() {
         expect(inNav(user.displayName), findsNothing);
 
         // The routed screen fills the content area.
-        expect(
-          find.text('The dashboard arrives in a later release.'),
-          findsOneWidget,
-        );
+        expect(find.text('Status breakdown'), findsOneWidget);
       },
     );
 
@@ -87,20 +84,14 @@ void main() {
         find.text('The complaint list arrives in a later release.'),
         findsOneWidget,
       );
-      expect(
-        find.text('The dashboard arrives in a later release.'),
-        findsNothing,
-      );
+      expect(find.text('Status breakdown'), findsNothing);
       expect(sideNav(tester).selectedIndex, 1);
       expect(inTopBar('Complaints'), findsOneWidget);
 
       await tester.tap(inNav('Dashboard'));
       await tester.pumpAndSettle();
       expect(router.state.uri.path, AppRoutes.dashboard);
-      expect(
-        find.text('The dashboard arrives in a later release.'),
-        findsOneWidget,
-      );
+      expect(find.text('Status breakdown'), findsOneWidget);
       expect(sideNav(tester).selectedIndex, 0);
       expect(inTopBar('Dashboard'), findsOneWidget);
     });
@@ -128,10 +119,7 @@ void main() {
       // The side nav still navigates away from the detail.
       await tester.tap(inNav('Dashboard'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('The dashboard arrives in a later release.'),
-        findsOneWidget,
-      );
+      expect(find.text('Status breakdown'), findsOneWidget);
     });
 
     testWidgets('Sign out returns to Login and closes the session', (
@@ -227,10 +215,7 @@ void main() {
       // No persistent nav; the page and the top bar fit without overflow.
       expect(find.byType(AdminSideNav), findsNothing);
       expect(find.byTooltip('Open navigation'), findsOneWidget);
-      expect(
-        find.text('The dashboard arrives in a later release.'),
-        findsOneWidget,
-      );
+      expect(find.text('Status breakdown'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.tap(find.byTooltip('Open navigation'));

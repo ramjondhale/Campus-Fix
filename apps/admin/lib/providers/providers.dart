@@ -6,7 +6,9 @@
 /// may read it (see `complaints.dart`).
 library;
 
+export 'complaint_query.dart';
 export 'complaints.dart';
+export 'dashboard.dart';
 export 'repositories.dart' hide complaintRepositoryProvider;
 export 'services.dart';
 export 'session.dart';

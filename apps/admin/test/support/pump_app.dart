@@ -14,12 +14,16 @@ final SeedData testSeed = SeedData.build();
 const Size desktopSize = Size(1440, 900);
 
 /// The provider overrides every test uses: no simulated latency (unless a
-/// test wants to observe a loading state) and the deterministic [testSeed], so
-/// state settles without real timers. A provider may be overridden only once,
-/// so extra overrides must not repeat these two.
+/// test wants to observe a loading state), the deterministic [testSeed] and
+/// the dashboard clock pinned to the seed's reference time, so state settles
+/// without real timers. A provider may be overridden only once, so extra
+/// overrides must not repeat these.
 List<Override> testOverrides({Duration latency = Duration.zero}) => <Override>[
   mockLatencyProvider.overrideWithValue(latency),
   seedDataProvider.overrideWithValue(testSeed),
+  // The dashboard measures its ranges with the seed's own reference time, so
+  // the numbers do not depend on the day the tests run.
+  dashboardClockProvider.overrideWithValue(() => testSeed.now),
 ];
 
 /// A container wired like the app, for provider-level tests.
