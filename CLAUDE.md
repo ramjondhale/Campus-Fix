@@ -2,7 +2,7 @@
 
 College-only complaint & maintenance app. **Flutter mobile + Flutter Web admin**, Firebase backend is
 **Phase 2** (prototype uses in-memory mocks). Full plan/state live in `docs/` — start at
-[docs/RUN-LEDGER.md](docs/RUN-LEDGER.md) (the resume point) and [docs/PLAN.md](docs/PLAN.md).
+[docs/process/RUN-LEDGER.md](docs/process/RUN-LEDGER.md) (the build record) and [docs/process/PLAN.md](docs/process/PLAN.md).
 
 ## Repo layout
 - `packages/campusfix_core` — pure Dart: models, 11 enums, logic (priority engine, status machine,
@@ -21,7 +21,8 @@ College-only complaint & maintenance app. **Flutter mobile + Flutter Web admin**
   `features/complaint_detail/`; `ReporterIdentity`/`.reporter` only in
   `features/complaint_detail/identity_panel.dart`. Dashboard/list use `PublicComplaintView` only via
   `providers/complaints.dart`. Filter URL contract: `providers/complaint_query.dart`.
-- `docs/` — PLAN, RUN-LEDGER, ARCHITECTURE, ORCHESTRATION, BUILDING, specs/, design/.
+- `docs/` — ARCHITECTURE, REQUIREMENTS, BUILDING, WALKTHROUGH, phase-2-firebase-plan, specs/, design/;
+  build-process archive (PLAN, RUN-LEDGER, ORCHESTRATION) under `docs/process/`.
 
 ## HARD RULES (do not violate)
 1. **Design system is law.** Style only via `campusfix_design` tokens/`ThemeExtension`s/`BuildContext`

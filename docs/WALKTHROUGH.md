@@ -2,7 +2,7 @@
 
 A guided tour of the working prototype: what exists, how to run it, who can do what, and why it is
 built the way it is. Written for a new developer or a stakeholder. Everything here reflects the code as
-built (state recorded in [RUN-LEDGER.md](RUN-LEDGER.md)); the specs under [specs/](specs/) are the
+built (state recorded in [RUN-LEDGER.md](process/RUN-LEDGER.md)); the specs under [specs/](specs/) are the
 contracts the code implements.
 
 **Contents**
@@ -35,7 +35,7 @@ requirement list (R1 to R18).
 
 ## 2. What is in the repository
 
-| Part | Path | What it is | Tests (per [RUN-LEDGER.md](RUN-LEDGER.md)) |
+| Part | Path | What it is | Tests (per [RUN-LEDGER.md](process/RUN-LEDGER.md)) |
 |---|---|---|---|
 | Mobile app | [`apps/mobile`](../apps/mobile) | Flutter app for **reporters, maintenance staff and verifiers** (all three role flows are complete). | 199 |
 | Admin web console | [`apps/admin`](../apps/admin) | Flutter **Web** console for **admins and verifiers**: login, dashboard, complaint list, complaint detail and manage. | 344 |
@@ -415,7 +415,7 @@ and widgets. No raw `Colors.*` (except `Colors.transparent`), `Color(0x...)`, he
 
 | You want to | Read |
 |---|---|
-| See current state and the resume point | [RUN-LEDGER.md](RUN-LEDGER.md), [PLAN.md](PLAN.md) |
+| See the build record and plan | [process/RUN-LEDGER.md](process/RUN-LEDGER.md), [process/PLAN.md](process/PLAN.md) |
 | Understand the structure and decisions | [ARCHITECTURE.md](ARCHITECTURE.md), [CLAUDE.md](../CLAUDE.md) (hard rules and known issues) |
 | Trace a requirement to a behavior | [REQUIREMENTS.md](REQUIREMENTS.md), [specs/](specs/) |
 | Build, run and debug | [BUILDING.md](BUILDING.md) |

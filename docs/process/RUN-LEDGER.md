@@ -6,11 +6,15 @@ Status: ⬜ not started · 🟡 in progress · 🔵 in review (merged, verifying
 _Last updated: 2026-10-07 — by orchestrator._
 
 ## Current state
-- **Phase:** 1 (design system + clickable prototype).
-- **🎉 ALL BUILD CHUNKS DONE.** Wave 5 (mobile, S4.1–S4.6) ✅ + Wave 6 (admin web, S5.1–S5.4) ✅. The
-  prototype is feature-complete: mobile app (reporter/maintenance/verifier) + admin web console (login,
-  dashboard, list, detail/manage with admin-only identity reveal). Remaining = **S6** only
-  (integration ✓ all suites green, WALKTHROUGH.md, doc cleanup, Phase-2 Firebase plan). **Resume at S6.**
+- **Phase:** 1 (design system + clickable prototype) — **✅ COMPLETE.**
+- **🎉 PROJECT COMPLETE.** All waves done: core (S0–S2), design system (S1/S3), mobile app (Wave 5,
+  S4.1–S4.6), admin web (Wave 6, S5.1–S5.4), integration + docs + cleanup (S6). Feature-complete prototype:
+  mobile app (reporter/maintenance/verifier) + admin web console (login, dashboard, list, detail/manage
+  with admin-only identity reveal). **1,418 tests green** (core 651, design 224, mobile 199, admin 344);
+  analyze clean; admin `flutter build web` ✓. Phase 2 (Firebase) is planned in
+  [../phase-2-firebase-plan.md](../phase-2-firebase-plan.md), not built.
+- **Open follow-ups (not blockers):** iOS simulator build (App.framework — [../BUILDING.md](../BUILDING.md));
+  `AppSelect` wide-window bug in the design package; maintenance demo-seed queue is empty (demo polish).
 - **✅ Verified:** core 651, mobile 199, admin 344 tests all green; analyze clean everywhere; admin
   `flutter build web` ✓; dashboard verified live in the browser pane (faithful, no drift). iOS build still
   blocked (S6/BUILDING.md); web is the visually-verifiable target.
@@ -100,7 +104,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | S5.3 Complaint list + filters | ✅ | A | merged | 364d6ff | A-03: design `ComplaintTable` (8 public cols, no reporter) + composed `FilterBar` (status/priority/category/department+Unassigned/building/created-range/unresolved+triage toggles/search/Reset) + sort (default: priority-weight desc then longest-waiting, AC-50) + pagination (25/50). Full URL round-trip (filter+sort+page+size); ~50 dashboard preset URLs match byte-for-byte; Critical/High→exactly 9 rows end-to-end (AC-47/49). Identity-free (AC-48). 243 admin tests, core 651, analyze clean, web build ✓. |
 | S5.4 Complaint management | ✅ | A | merged | 4eafee6 | A-04 detail/manage. A: AdminComplaintView + collapsed-by-default identity reveal (LK-8: explicit reveal, re-collapse on nav/sign-out, never in URL/title, no copy/export), priority/assignment/full-actor timeline panels, all 10 manage actions (review&route, assign, reassign, start/resolve on behalf, verify, close[A-only], reject, priority override, safety toggle) gated by nextStatuses+preconditions. V: public view only, no identity/assignee/priority-input/Close, public timeline. AC-51..55 covered. Admin guard extended (exact allow-list: complaint_detail/ + identity_panel.dart). 344 admin tests, core 651, analyze clean, web build ✓. Worked around AppSelect bug with toggle chips. |
 | S6.1 Integrate + build + smoke | ✅ | O | main | 60e9f0c | All chunks merged; final gate green — core 651 / design 224 / mobile 199 / admin 344 (=1418); analyze clean; admin `flutter build web` ✓; dashboard verified live. iOS build still blocked (BUILDING.md). |
-| S6.2 Walkthrough + cleanup | 🟡 | O | main | 60e9f0c | WALKTHROUGH.md ✅. Doc cleanup pending (user decision). |
+| S6.2 Walkthrough + cleanup | ✅ | O | main | (final) | WALKTHROUGH.md ✅. Doc cleanup done: product/reference docs kept at `docs/` top level; build-process docs (PLAN, RUN-LEDGER, ORCHESTRATION) archived to `docs/process/` (user decision); README rewritten; CLAUDE.md kept. |
 | S6.3 Phase-2 Firebase plan | ✅ | O | main | 60e9f0c | docs/phase-2-firebase-plan.md (repo-interface seams → Firebase; Firestore + security rules enforcing the privacy model; identity-reveal audit log; FCM; rollout). |
 
 ## Design system
@@ -152,6 +156,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | 20 | 2026-10-07 | 364d6ff | S5.3 admin complaint list merged (A-03 table/filters/sort/pagination/URL-sync; dashboard presets round-trip); 243 admin tests, core 651 green, analyze clean, web build ✓. |
 | 21 | 2026-10-07 | 4eafee6 | S5.4 admin detail/manage + admin-only identity reveal merged (A-04; all manage actions; A/V split; guard extended). 344 admin tests, core 651 green, analyze clean, web build ✓. **ALL build chunks complete — only S6 remains.** |
 | 22 | 2026-10-07 | 60e9f0c | S6 docs merged (WALKTHROUGH.md + phase-2-firebase-plan.md). Final integration gate green: core 651 / design 224 / mobile 199 / admin 344 = 1418 tests. Enum-count docs corrected (11). S6.1/S6.3 ✅; S6.2 cleanup pending user decision. |
+| 23 | 2026-10-07 | (final) | S6.2 doc cleanup: archived PLAN/RUN-LEDGER/ORCHESTRATION to docs/process/ (user chose archive-not-delete; CLAUDE.md kept); rewrote README + fixed all cross-links. **PROJECT COMPLETE — Phase 1 done. All waves ✅.** |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

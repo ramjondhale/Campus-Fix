@@ -6,8 +6,10 @@ assigns a unique Complaint ID, computes priority, routes to the right maintenanc
 repair through a verified status flow, and keeps before/after evidence — **while hiding reporter
 identity on all normal views**.
 
-> Status: **Phase 1 — Design system + clickable prototype (mock data).** Firebase backend is planned
-> for Phase 2 and is deliberately out of scope until the prototype is approved.
+> Status: **Phase 1 complete — design system + clickable prototype (mock data).** The mobile app (all
+> three roles) and the admin web console are feature-complete; **1,418 tests pass** (core 651, design 224,
+> mobile 199, admin 344). Firebase backend is Phase 2 (see the [plan](docs/phase-2-firebase-plan.md)).
+> New here? Start with the **[Walkthrough](docs/WALKTHROUGH.md)**.
 
 ## Tech at a glance
 - **Mobile app** — Flutter (`apps/mobile`) for students/staff, maintenance staff, and verifiers.
@@ -21,7 +23,7 @@ identity on all normal views**.
 ## Repository layout
 ```
 campusfix/
-├── docs/            # Plan, run ledger, architecture, requirements, specs, design
+├── docs/            # Walkthrough, building, architecture, requirements, phase-2 plan, specs, design, process/
 ├── packages/
 │   ├── campusfix_core/      # pure-Dart models + business logic + mock data
 │   └── campusfix_design/    # design system (theme, tokens, widgets)
@@ -33,19 +35,28 @@ campusfix/
 ## Documentation
 | Doc | Purpose |
 |---|---|
-| [docs/PLAN.md](docs/PLAN.md) | Master plan — sections (epics) broken into agent-sized chunks |
-| [docs/RUN-LEDGER.md](docs/RUN-LEDGER.md) | Live progress tracker (resume point) |
+| [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) | **Start here** — guided tour: what exists, how to run it, who does what, the privacy model |
+| [docs/BUILDING.md](docs/BUILDING.md) | Prerequisites, build/run/test commands, the iOS build note |
 | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | Distilled requirements + traceability |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical decisions & structure |
-| [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md) | How orchestrator + agents collaborate |
+| [docs/phase-2-firebase-plan.md](docs/phase-2-firebase-plan.md) | The Phase-2 backend plan (Auth, Firestore + security rules, Storage, FCM) |
 | [docs/specs/](docs/specs/) | Detailed specs (data model, priority, status, assignment, privacy, screens) |
-| [docs/design/](docs/design/) | Design system definition + Claude Design links |
+| [docs/design/](docs/design/) | Design system definition + published style guide |
+| [docs/process/](docs/process/) | Build-history archive (plan, run ledger, orchestration) |
 
-## Running (once scaffolded)
+## Running
 ```bash
-# Mobile (iOS simulator)
+# Admin web console — the fully runnable target
+cd apps/admin && flutter run -d chrome
+
+# Mobile app (iOS simulator / Android device; see BUILDING.md for the current iOS build note)
 cd apps/mobile && flutter run
 
-# Admin (Chrome)
-cd apps/admin && flutter run -d chrome
+# Tests (core 651 · design 224 · mobile 199 · admin 344)
+cd packages/campusfix_core && dart test
+cd packages/campusfix_design && flutter test
+cd apps/mobile && flutter test
+cd apps/admin && flutter test
 ```
+See the [Walkthrough](docs/WALKTHROUGH.md) for demo accounts and the role-by-role flows, and
+[BUILDING.md](docs/BUILDING.md) for prerequisites and the iOS build note.

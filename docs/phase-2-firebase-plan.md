@@ -1,7 +1,7 @@
 # CampusFix AI — Phase 2: Firebase backend plan
 
 **Audience:** the team that builds the real backend. **Status:** plan, not built. **Inputs:** the as-built
-prototype ([WALKTHROUGH.md](WALKTHROUGH.md), [RUN-LEDGER.md](RUN-LEDGER.md)) and the specs
+prototype ([WALKTHROUGH.md](WALKTHROUGH.md), [RUN-LEDGER.md](process/RUN-LEDGER.md)) and the specs
 ([data-model](specs/data-model-spec.md), [privacy](specs/privacy-spec.md),
 [status-machine](specs/status-machine-spec.md), [priority](specs/priority-engine-spec.md),
 [assignment](specs/assignment-routing-spec.md), [screens](specs/screens-spec.md)). This document fulfils the
