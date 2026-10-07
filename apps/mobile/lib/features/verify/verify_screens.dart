@@ -1,29 +1,9 @@
-import 'package:flutter/material.dart';
+/// The verifier's flow (screens-spec M-16, M-17): the verification queue and
+/// the verify / reject detail. The router imports the two screens from here.
+///
+/// The verifier verifies (T5) or sends the job back (T7); closing a verified
+/// complaint (T6) is an admin-only action on the web console.
+library;
 
-import '../shared/coming_soon_screen.dart';
-
-/// Stub for M-16 Verification Queue (verifier; built in S4.6). Reached from
-/// Home "Open verification queue"; the bottom-nav "Verify" tab keeps its
-/// selection here.
-class VerificationQueueScreen extends StatelessWidget {
-  const VerificationQueueScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const ComingSoonScreen(
-    title: 'Verification queue',
-    icon: Icons.fact_check_outlined,
-  );
-}
-
-/// Stub for M-17 Verify & Close (`/verify/:id`, S4.6).
-class VerifyCloseScreen extends StatelessWidget {
-  const VerifyCloseScreen({super.key, required this.complaintId});
-
-  final String complaintId;
-
-  @override
-  Widget build(BuildContext context) => const ComingSoonScreen(
-    title: 'Verify & close',
-    icon: Icons.fact_check_outlined,
-  );
-}
+export 'verification_queue_screen.dart' show VerificationQueueScreen;
+export 'verify_detail_screen.dart' show VerifyCloseScreen;
