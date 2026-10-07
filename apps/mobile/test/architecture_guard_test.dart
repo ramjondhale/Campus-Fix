@@ -26,10 +26,22 @@ void main() {
   };
 
   test('the scanner flags violations (positive controls)', () {
-    expect(forbidden['ReporterIdentity']!.hasMatch('ReporterIdentity r;'), isTrue);
-    expect(forbidden['.reporter access']!.hasMatch('c.reporter.fullName'), isTrue);
-    expect(forbidden['.reporter access']!.hasMatch('UserRole.reporter'), isFalse);
-    expect(forbidden['raw Complaint type']!.hasMatch('List<Complaint> all'), isTrue);
+    expect(
+      forbidden['ReporterIdentity']!.hasMatch('ReporterIdentity r;'),
+      isTrue,
+    );
+    expect(
+      forbidden['.reporter access']!.hasMatch('c.reporter.fullName'),
+      isTrue,
+    );
+    expect(
+      forbidden['.reporter access']!.hasMatch('UserRole.reporter'),
+      isFalse,
+    );
+    expect(
+      forbidden['raw Complaint type']!.hasMatch('List<Complaint> all'),
+      isTrue,
+    );
     expect(
       forbidden['raw Complaint type']!.hasMatch('PublicComplaintView v'),
       isFalse,
@@ -37,13 +49,17 @@ void main() {
   });
 
   test('screens, shell and router never see raw complaints or identity', () {
-    final List<File> files = <Directory>[
-      Directory('lib/features'),
-      Directory('lib/shell'),
-      Directory('lib/router'),
-    ].expand((d) => d.listSync(recursive: true)).whereType<File>().where(
-      (f) => f.path.endsWith('.dart'),
-    ).toList()..add(File('lib/app.dart'));
+    final List<File> files =
+        <Directory>[
+              Directory('lib/features'),
+              Directory('lib/shell'),
+              Directory('lib/router'),
+            ]
+            .expand((d) => d.listSync(recursive: true))
+            .whereType<File>()
+            .where((f) => f.path.endsWith('.dart'))
+            .toList()
+          ..add(File('lib/app.dart'));
     expect(files, isNotEmpty);
 
     final List<String> violations = <String>[];

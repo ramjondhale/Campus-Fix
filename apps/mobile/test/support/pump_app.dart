@@ -1,5 +1,3 @@
-import 'dart:ui' show Size;
-
 import 'package:campusfix_core/campusfix_core.dart';
 import 'package:campusfix_mobile/app.dart';
 import 'package:campusfix_mobile/providers/providers.dart';

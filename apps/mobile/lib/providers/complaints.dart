@@ -72,10 +72,9 @@ bool _isRework(Complaint c) {
 
 /// The Campus Problem Board's source: every complaint in the system, as public
 /// views, in repository order. Screens filter/sort it for their own needs.
-final boardComplaintsProvider =
-    Provider<AsyncValue<List<PublicComplaintView>>>(
-      (ref) => ref.watch(_rawComplaintsProvider).whenData(toPublicViews),
-    );
+final boardComplaintsProvider = Provider<AsyncValue<List<PublicComplaintView>>>(
+  (ref) => ref.watch(_rawComplaintsProvider).whenData(toPublicViews),
+);
 
 /// The signed-in reporter's own complaints (`reporter.userId` equals the
 /// session user), `updatedAt` descending. Ownership is resolved on the raw

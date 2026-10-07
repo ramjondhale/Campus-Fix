@@ -149,7 +149,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: AppSpace.s8),
                     Semantics(
                       header: true,
-                      child: Text('Demo accounts', style: theme.textTheme.titleSmall),
+                      child: Text(
+                        'Demo accounts',
+                        style: theme.textTheme.titleSmall,
+                      ),
                     ),
                     const SizedBox(height: AppSpace.s1),
                     Text(

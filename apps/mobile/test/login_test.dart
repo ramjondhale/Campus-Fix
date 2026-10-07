@@ -65,25 +65,27 @@ void main() {
     expect(password.controller.text, isEmpty);
   });
 
-  testWidgets('AC-04 an admin sign-in shows the web-console notice, no session',
-      (tester) async {
-    final container = await pumpCampusFix(tester);
-    final admin = testSeed.demoAccounts.firstWhere(
-      (a) => a.user.role == UserRole.admin,
-    );
+  testWidgets(
+    'AC-04 an admin sign-in shows the web-console notice, no session',
+    (tester) async {
+      final container = await pumpCampusFix(tester);
+      final admin = testSeed.demoAccounts.firstWhere(
+        (a) => a.user.role == UserRole.admin,
+      );
 
-    await tester.enterText(
-      find.byType(EditableText).at(0),
-      admin.user.idNumber,
-    );
-    await tester.enterText(find.byType(EditableText).at(1), admin.password);
-    await tester.pump();
-    await tester.tap(find.text('Sign in'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(EditableText).at(0),
+        admin.user.idNumber,
+      );
+      await tester.enterText(find.byType(EditableText).at(1), admin.password);
+      await tester.pump();
+      await tester.tap(find.text('Sign in'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Admins use the web console'), findsOneWidget);
-    expect(find.text('Sign in with your ID number'), findsOneWidget);
-    expect(container.read(sessionProvider), isNull);
-    expect(container.read(authRepositoryProvider).currentUser, isNull);
-  });
+      expect(find.text('Admins use the web console'), findsOneWidget);
+      expect(find.text('Sign in with your ID number'), findsOneWidget);
+      expect(container.read(sessionProvider), isNull);
+      expect(container.read(authRepositoryProvider).currentUser, isNull);
+    },
+  );
 }

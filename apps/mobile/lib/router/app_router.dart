@@ -96,8 +96,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: <RouteBase>[
           GoRoute(
             path: AppRoutes.home,
-            builder: (context, state) =>
-                _guard(_allMobile, const HomeScreen()),
+            builder: (context, state) => _guard(_allMobile, const HomeScreen()),
           ),
           GoRoute(
             path: AppRoutes.complaints,
@@ -116,7 +115,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.board,
-            builder: (context, state) => _guard(_allMobile, const BoardScreen()),
+            builder: (context, state) =>
+                _guard(_allMobile, const BoardScreen()),
             routes: <RouteBase>[
               GoRoute(
                 path: ':id',

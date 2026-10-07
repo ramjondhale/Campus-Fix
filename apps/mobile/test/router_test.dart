@@ -1,5 +1,4 @@
 import 'package:campusfix_core/campusfix_core.dart';
-import 'package:campusfix_mobile/providers/providers.dart';
 import 'package:campusfix_mobile/router/app_router.dart';
 import 'package:campusfix_mobile/router/routes.dart';
 import 'package:campusfix_mobile/shell/role_scaffold.dart';
@@ -9,17 +8,19 @@ import 'support/pump_app.dart';
 
 void main() {
   group('route policy (screens-spec section 5)', () {
-    test('reporter opens the report flow and own complaints, not work/verify',
-        () {
-      const r = UserRole.reporter;
-      expect(roleMayOpen(r, AppRoutes.home), isTrue);
-      expect(roleMayOpen(r, AppRoutes.reportCategory), isTrue);
-      expect(roleMayOpen(r, AppRoutes.reportDone('CF-2026-00001')), isTrue);
-      expect(roleMayOpen(r, AppRoutes.complaint('CF-2026-00001')), isTrue);
-      expect(roleMayOpen(r, AppRoutes.boardItem('CF-2026-00001')), isTrue);
-      expect(roleMayOpen(r, AppRoutes.work), isFalse);
-      expect(roleMayOpen(r, AppRoutes.verify), isFalse);
-    });
+    test(
+      'reporter opens the report flow and own complaints, not work/verify',
+      () {
+        const r = UserRole.reporter;
+        expect(roleMayOpen(r, AppRoutes.home), isTrue);
+        expect(roleMayOpen(r, AppRoutes.reportCategory), isTrue);
+        expect(roleMayOpen(r, AppRoutes.reportDone('CF-2026-00001')), isTrue);
+        expect(roleMayOpen(r, AppRoutes.complaint('CF-2026-00001')), isTrue);
+        expect(roleMayOpen(r, AppRoutes.boardItem('CF-2026-00001')), isTrue);
+        expect(roleMayOpen(r, AppRoutes.work), isFalse);
+        expect(roleMayOpen(r, AppRoutes.verify), isFalse);
+      },
+    );
 
     test('maintenance opens work, board, notifications only', () {
       const m = UserRole.maintenance;

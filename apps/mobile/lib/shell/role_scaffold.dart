@@ -64,8 +64,9 @@ class RoleScaffold extends ConsumerWidget {
     final AppUser? user = ref.watch(sessionProvider);
     if (user == null) return const SizedBox.shrink();
     final List<String> paths = navPathsFor(user.role);
-    final List<AppNavDestination> destinations =
-        AppBottomNav.destinationsFor(user.role).take(paths.length).toList();
+    final List<AppNavDestination> destinations = AppBottomNav.destinationsFor(
+      user.role,
+    ).take(paths.length).toList();
     final int unread = ref.watch(unreadNotificationCountProvider);
     final int alerts = paths.indexOf(AppRoutes.notifications);
     if (alerts >= 0 && unread > 0) {

@@ -1,7 +1,6 @@
 import 'package:campusfix_core/campusfix_core.dart';
 import 'package:campusfix_design/campusfix_design.dart';
 import 'package:campusfix_mobile/providers/providers.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/pump_app.dart';
@@ -44,7 +43,10 @@ void main() {
     expect(find.text('Open my work'), findsOneWidget);
     expect(find.text('Report a Problem'), findsNothing);
     final bar = find.byType(AppBottomNav);
-    expect(find.descendant(of: bar, matching: find.text('Work')), findsOneWidget);
+    expect(
+      find.descendant(of: bar, matching: find.text('Work')),
+      findsOneWidget,
+    );
     expect(
       find.descendant(of: bar, matching: find.text('My Complaints')),
       findsNothing,
