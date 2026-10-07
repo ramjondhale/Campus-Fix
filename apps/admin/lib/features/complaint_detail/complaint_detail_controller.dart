@@ -152,37 +152,55 @@ class ComplaintDetail {
 /// when no such complaint exists. Stays loading for a viewer who is not an
 /// admin (the router and the role guard already keep them out; this keeps the
 /// data out too).
+///
+/// Every dependency is read up front, synchronously: the stream below starts
+/// lazily, possibly after this provider was already rebuilt (a sign-out), and
+/// must not touch the `ref` then.
 final _adminDetailProvider = StreamProvider.autoDispose
-    .family<ComplaintDetail?, String>((ref, id) async* {
+    .family<ComplaintDetail?, String>((ref, id) {
       final AppUser? actor = ref.watch(sessionProvider);
-      if (actor == null || !actor.role.canSeeReporterIdentity) return;
-      final ComplaintRepository repo = ref.watch(complaintRepositoryProvider);
-
-      // Staff only: a reporter user never enters the directory, so a reporter
-      // actor on the timeline stays a bare role until the reveal.
-      final Map<String, StaffRef> staff = <String, StaffRef>{
-        for (final AppUser u in await ref.watch(userRepositoryProvider).all())
-          if (u.role != UserRole.reporter) u.id: StaffRef.of(u),
-      };
-
-      ComplaintDetail? build(Iterable<Complaint> all) {
-        for (final Complaint c in all) {
-          if (c.id != id) continue;
-          final AdminComplaintView? view = toAdminView(c, actor);
-          if (view == null) return null;
-          return ComplaintDetail.full(
-            complaint: toPublicView(c),
-            admin: AdminDetail(view: view, staff: staff),
-          );
-        }
-        return null;
+      if (actor == null || !actor.role.canSeeReporterIdentity) {
+        return const Stream<ComplaintDetail?>.empty();
       }
-
-      yield build(await repo.all());
-      await for (final List<Complaint> all in repo.watchAll()) {
-        yield build(all);
-      }
+      return _adminDetails(
+        id,
+        actor,
+        ref.watch(complaintRepositoryProvider),
+        ref.watch(userRepositoryProvider),
+      );
     });
+
+Stream<ComplaintDetail?> _adminDetails(
+  String id,
+  AppUser actor,
+  ComplaintRepository repo,
+  UserRepository users,
+) async* {
+  // Staff only: a reporter user never enters the directory, so a reporter
+  // actor on the timeline stays a bare role until the reveal.
+  final Map<String, StaffRef> staff = <String, StaffRef>{
+    for (final AppUser u in await users.all())
+      if (u.role != UserRole.reporter) u.id: StaffRef.of(u),
+  };
+
+  ComplaintDetail? build(Iterable<Complaint> all) {
+    for (final Complaint c in all) {
+      if (c.id != id) continue;
+      final AdminComplaintView? view = toAdminView(c, actor);
+      if (view == null) return null;
+      return ComplaintDetail.full(
+        complaint: toPublicView(c),
+        admin: AdminDetail(view: view, staff: staff),
+      );
+    }
+    return null;
+  }
+
+  yield build(await repo.all());
+  await for (final List<Complaint> all in repo.watchAll()) {
+    yield build(all);
+  }
+}
 
 /// Complaint [id] as the signed-in admin or verifier may see it: the admin
 /// form for an admin, the public-view form for a verifier. `null` once loaded
