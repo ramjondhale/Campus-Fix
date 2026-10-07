@@ -26,3 +26,12 @@ class StalledComplaintRepository extends MockComplaintRepository {
   @override
   Future<List<Complaint>> all() => never.future;
 }
+
+/// A notification repository whose first read never completes (loading).
+class StalledNotificationRepository extends MockNotificationRepository {
+  final Completer<List<AppNotification>> never =
+      Completer<List<AppNotification>>();
+
+  @override
+  Future<List<AppNotification>> byRecipient(String recipientId) => never.future;
+}
