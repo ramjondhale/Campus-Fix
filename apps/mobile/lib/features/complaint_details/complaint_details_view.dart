@@ -425,7 +425,7 @@ Future<void> showComplaintPhotoViewer(
   return showDialog<void>(
     context: context,
     builder: (BuildContext dialogContext) => Dialog.fullscreen(
-      backgroundColor: Colors.black,
+      backgroundColor: dialogContext.campusColors.photoOverlayBackground,
       child: Stack(
         children: <Widget>[
           Positioned.fill(
@@ -451,7 +451,7 @@ Future<void> showComplaintPhotoViewer(
               alignment: Alignment.topRight,
               child: IconButton(
                 tooltip: 'Close',
-                color: Colors.white,
+                color: dialogContext.campusColors.photoOverlayForeground,
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.of(dialogContext).pop(),
               ),
