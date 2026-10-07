@@ -11,7 +11,7 @@ import 'support/pump_app.dart';
 import 'support/work_fixtures.dart';
 
 /// A container wired like the app with [repository] as the complaint store,
-/// the demo electrician signed in and the write controller kept alive (it is
+/// the demo maintenance worker signed in and the write controller kept alive (it is
 /// auto-disposed, so something must listen).
 Future<ProviderContainer> workContainer({
   ComplaintRepository? repository,
@@ -89,7 +89,7 @@ void main() {
 
     test('another department\'s job is blocked (P6)', () async {
       final ProviderContainer container = await workContainer();
-      // A plumber's job, put back to `assigned`, is not the electrician's.
+      // A plumber's job, put back to `assigned`, is not the demo worker's.
       final Complaint plumbing = (await stored(
         container,
         plumberJob,

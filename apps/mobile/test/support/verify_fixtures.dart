@@ -43,8 +43,10 @@ const String inProgressJob = 'CF-2026-00020';
 const String sentBackJob = 'CF-2026-00017';
 const String reportedJob = 'CF-2026-00025';
 
-/// The electrician who owns [criticalElectrical] (the demo maintenance login).
-String get electricianId => demoAccount(UserRole.maintenance).user.id;
+/// The demo maintenance worker (the account behind the Maintenance quick-fill).
+/// In the stock seed [criticalElectrical] belongs to the electrician, not to
+/// this worker; see [verifyRepositoryWithDemoWorkerJob].
+String get demoWorkerId => demoAccount(UserRole.maintenance).user.id;
 
 DateTime _resolvedAt(Complaint c) {
   for (final StatusEvent e in c.timeline.reversed) {
@@ -74,6 +76,27 @@ List<String> queueOrder(Iterable<Complaint> all) {
 /// A repository holding the stock seed.
 MockComplaintRepository verifyRepository() =>
     MockComplaintRepository(initial: testSeed.complaints);
+
+/// The stock seed with [criticalElectrical] handed to the demo maintenance
+/// worker (same department, claimed by them), so a verifier's rejection lands
+/// in that worker's own Rework tab whichever worker the demo login points at.
+MockComplaintRepository verifyRepositoryWithDemoWorkerJob() {
+  final AppUser worker = demoAccount(UserRole.maintenance).user;
+  return MockComplaintRepository(
+    initial: <Complaint>[
+      for (final Complaint c in testSeed.complaints)
+        if (c.id == criticalElectrical)
+          c.copyWith(
+            assignment: c.assignment!.copyWith(
+              department: worker.department,
+              assigneeId: worker.id,
+            ),
+          )
+        else
+          c,
+    ],
+  );
+}
 
 /// The seed with [lowFurniture]'s repair evidence stripped (no after-photo,
 /// no resolution note): corrupt data a verifier can only send back.

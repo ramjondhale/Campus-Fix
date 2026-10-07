@@ -255,7 +255,7 @@ void main() {
             complaintId: queued,
             type: NotificationType.assignment,
             title: 'New work assigned',
-            body: 'Complaint $queued assigned to Electrician.',
+            body: 'Complaint $queued assigned to ${me.department!.label}.',
             createdAt: DateTime.now(),
           ),
         );
