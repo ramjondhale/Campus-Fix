@@ -322,8 +322,8 @@ class _IdentityHiddenNote extends StatelessWidget {
           const SizedBox(width: AppSpace.s2),
           Expanded(
             child: Text(
-              'Identity is hidden. Nobody can see who reported a problem. '
-              'Check here before reporting to avoid duplicates.',
+              'Identity is hidden: the board never shows who reported a '
+              'problem. Check here before reporting to avoid duplicates.',
               style: theme.textTheme.bodySmall!.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
