@@ -88,7 +88,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.complaints,
-            builder: (context, state) => _guard(const ComplaintListScreen()),
+            builder: (context, state) => _guard(
+              ComplaintListScreen(queryParameters: state.uri.queryParameters),
+            ),
             routes: <RouteBase>[
               GoRoute(
                 path: ':id',
