@@ -5,11 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/providers.dart';
 import '../../router/routes.dart';
+import '../shared/sample_photo_picker.dart';
 import 'report_flow.dart';
-
-/// Where a photo comes from. The prototype has no camera or gallery: both
-/// pick a bundled sample (assumption A4).
-enum _PhotoSource { camera, gallery }
 
 /// M-05 Report: Photo Upload (step 3 of 5). One to five before-repair photos,
 /// shown with the drawn placeholder; an optional public caption each.
@@ -26,23 +23,7 @@ class _PhotosStepState extends ConsumerState<PhotosStep> {
   String? _selectedId;
 
   Future<void> _add() async {
-    final _PhotoSource? source = await AppBottomSheet.showOptions<_PhotoSource>(
-      context: context,
-      title: 'Add a photo',
-      options: const <AppSheetOption<_PhotoSource>>[
-        AppSheetOption<_PhotoSource>(
-          value: _PhotoSource.camera,
-          label: 'Take a photo (sample)',
-          icon: Icons.photo_camera_outlined,
-        ),
-        AppSheetOption<_PhotoSource>(
-          value: _PhotoSource.gallery,
-          label: 'Choose from gallery (sample)',
-          icon: Icons.photo_library_outlined,
-        ),
-      ],
-    );
-    if (source == null) return;
+    if (!await pickSamplePhoto(context)) return;
     ref.read(reportDraftProvider.notifier).addPhoto();
   }
 

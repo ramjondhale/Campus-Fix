@@ -25,7 +25,9 @@ enum ComplaintDetailsMode {
 ///
 /// [value] is the lookup result: `null` once loaded means "no such
 /// complaint". [notFound] replaces the default E-404 (the owner page uses it
-/// to forward a non-owner to the board item).
+/// to forward a non-owner to the board item). [bodyBuilder] replaces the
+/// default [ComplaintDetailsView] body (the maintenance Work Detail wraps it
+/// with its actions).
 class ComplaintDetailsPage extends StatelessWidget {
   const ComplaintDetailsPage({
     super.key,
@@ -34,6 +36,7 @@ class ComplaintDetailsPage extends StatelessWidget {
     required this.mode,
     required this.onRetry,
     this.notFound,
+    this.bodyBuilder,
   });
 
   final String title;
@@ -41,13 +44,15 @@ class ComplaintDetailsPage extends StatelessWidget {
   final ComplaintDetailsMode mode;
   final VoidCallback onRetry;
   final Widget? notFound;
+  final Widget Function(BuildContext context, PublicComplaintView complaint)?
+  bodyBuilder;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppTopBar.page(title: title, onBack: () => popOrHome(context)),
       body: value.when(
-        loading: () => const _DetailsSkeleton(),
+        loading: () => const ComplaintDetailsSkeleton(),
         error: (_, _) => EmptyState.error(
           title: "Couldn't load this complaint",
           onAction: onRetry,
@@ -57,15 +62,17 @@ class ComplaintDetailsPage extends StatelessWidget {
             return notFound ??
                 EmptyState.notFound(onAction: () => context.go(AppRoutes.home));
           }
-          return ComplaintDetailsView(complaint: c, mode: mode);
+          return bodyBuilder?.call(context, c) ??
+              ComplaintDetailsView(complaint: c, mode: mode);
         },
       ),
     );
   }
 }
 
-class _DetailsSkeleton extends StatelessWidget {
-  const _DetailsSkeleton();
+/// The loading placeholder of a details page.
+class ComplaintDetailsSkeleton extends StatelessWidget {
+  const ComplaintDetailsSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -97,10 +104,19 @@ class ComplaintDetailsView extends StatelessWidget {
     required this.complaint,
     this.mode = ComplaintDetailsMode.owner,
     this.now,
+    this.leading = const <Widget>[],
+    this.trailing = const <Widget>[],
   });
 
   final PublicComplaintView complaint;
   final ComplaintDetailsMode mode;
+
+  /// Extra blocks right under the header (e.g. a rework notice), each spaced
+  /// like a card.
+  final List<Widget> leading;
+
+  /// Extra blocks after the cards, before the dates (e.g. a note field).
+  final List<Widget> trailing;
 
   /// Clock for relative times (tests).
   final DateTime? now;
@@ -120,6 +136,10 @@ class ComplaintDetailsView extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpace.s4),
       children: <Widget>[
         _Header(complaint: c),
+        for (final Widget w in leading) ...<Widget>[
+          const SizedBox(height: AppSpace.s4),
+          w,
+        ],
         if (c.status == ComplaintStatus.closed) ...<Widget>[
           const SizedBox(height: AppSpace.s4),
           const InlineBanner(
@@ -198,6 +218,10 @@ class ComplaintDetailsView extends StatelessWidget {
             title: 'Timeline',
             child: ComplaintTimeline(events: c.timeline, now: now),
           ),
+        ],
+        for (final Widget w in trailing) ...<Widget>[
+          const SizedBox(height: AppSpace.s4),
+          w,
         ],
         const SizedBox(height: AppSpace.s4),
         _Dates(complaint: c),
