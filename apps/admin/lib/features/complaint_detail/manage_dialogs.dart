@@ -382,31 +382,46 @@ class _ManageActionDialogState extends ConsumerState<ManageActionDialog> {
         ? 'A department other than ${route.label} makes this a manual '
               'assignment.'
         : null;
+    final Department? department = _department;
+    final List<StaffRef> staff = department == null
+        ? const <StaffRef>[]
+        : ref.watch(assignableStaffProvider(department)).value ??
+              const <StaffRef>[];
     return <Widget>[
-      AppSelect<Department>(
-        label: 'Department',
-        required: _action != ManageAction.reviewAndRoute,
-        hintText: _action == ManageAction.reviewAndRoute
-            ? 'No department yet'
-            : 'Choose a department',
-        helperText: departmentHelper,
-        value: _department,
+      _ChoiceGroup<Department>(
+        label: _action == ManageAction.reviewAndRoute
+            ? 'Department'
+            : 'Department (required)',
+        helper: departmentHelper,
         enabled: !busy,
-        options: <AppSelectOption<Department>>[
+        selected: _department,
+        choices: <_Choice<Department>>[
           for (final Department d in Department.values)
-            AppSelectOption<Department>(value: d, label: d.label),
+            _Choice<Department>(value: d, label: d.label),
         ],
         onChanged: (Department d) => setState(() {
           _department = d;
           _assigneeId = null;
         }),
       ),
-      const SizedBox(height: AppSpace.s3),
-      _StaffSelect(
-        department: _department,
-        value: _assigneeId,
-        enabled: !busy,
-        onChanged: (String? id) => setState(() => _assigneeId = id),
+      const SizedBox(height: AppSpace.s4),
+      _ChoiceGroup<String>(
+        label: 'Staff member (optional)',
+        helper: department == null ? 'Choose a department first.' : null,
+        enabled: !busy && department != null,
+        selected: department == null ? null : (_assigneeId ?? _anyone),
+        choices: <_Choice<String>>[
+          if (department != null) ...<_Choice<String>>[
+            const _Choice<String>(
+              value: _anyone,
+              label: 'Anyone in the department',
+            ),
+            for (final StaffRef s in staff)
+              _Choice<String>(value: s.id, label: s.line),
+          ],
+        ],
+        onChanged: (String id) =>
+            setState(() => _assigneeId = id == _anyone ? null : id),
       ),
     ];
   }
@@ -493,9 +508,11 @@ class _ManageActionDialogState extends ConsumerState<ManageActionDialog> {
         title: 'This complaint changed',
         message: 'Refresh to see the latest version, then try again.',
         actionLabel: 'Refresh',
-        onAction: () async {
+        onAction: () {
+          // Start the re-read first: it uses this dialog's ref, which is gone
+          // once the dialog has closed.
+          refreshComplaintDetail(ref, _c.id);
           Navigator.of(context).pop(false);
-          await refreshComplaintDetail(ref, _c.id);
         },
       ),
       DetailActionOutcome.failed => InlineBanner(
@@ -512,46 +529,79 @@ class _ManageActionDialogState extends ConsumerState<ManageActionDialog> {
   }
 }
 
-/// The optional staff member of an assignment: the maintenance staff of
-/// [department], or "anyone in the department".
-class _StaffSelect extends ConsumerWidget {
-  const _StaffSelect({
-    required this.department,
-    required this.value,
-    required this.enabled,
+/// The value of the "no specific person" choice of the staff group.
+const String _anyone = '';
+
+/// One choice of a [_ChoiceGroup].
+class _Choice<T> {
+  const _Choice({required this.value, required this.label});
+
+  final T value;
+  final String label;
+}
+
+/// A single-choice field made of the design system's toggle chips: the label,
+/// the chips side by side and an optional helper line.
+///
+/// Used instead of `AppSelect` for the department and staff choices: on a
+/// window wider than a phone `AppSelect` opens a Material `MenuAnchor` whose
+/// shrink-wrapped list cannot be measured (a layout assertion in debug, an
+/// empty menu in release), so the admin chooses with chips, which also show
+/// every option at once.
+class _ChoiceGroup<T> extends StatelessWidget {
+  const _ChoiceGroup({
+    required this.label,
+    required this.choices,
+    required this.selected,
     required this.onChanged,
+    required this.enabled,
+    this.helper,
   });
 
-  final Department? department;
-  final String? value;
+  final String label;
+  final String? helper;
+  final List<_Choice<T>> choices;
+  final T? selected;
   final bool enabled;
-  final ValueChanged<String?> onChanged;
-
-  /// The value of the "no specific person" option.
-  static const String _anyone = '';
+  final ValueChanged<T> onChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final Department? d = department;
-    final List<StaffRef> staff = d == null
-        ? const <StaffRef>[]
-        : ref.watch(assignableStaffProvider(d)).value ?? const <StaffRef>[];
-    return AppSelect<String>(
-      label: 'Staff member (optional)',
-      hintText: d == null
-          ? 'Choose a department first'
-          : 'Anyone in the department',
-      value: value ?? _anyone,
-      enabled: enabled && d != null,
-      options: <AppSelectOption<String>>[
-        const AppSelectOption<String>(
-          value: _anyone,
-          label: 'Anyone in the department',
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Semantics(
+          container: true,
+          label: label,
+          child: Text(label, style: theme.textTheme.labelLarge),
         ),
-        for (final StaffRef s in staff)
-          AppSelectOption<String>(value: s.id, label: s.line),
+        if (choices.isNotEmpty) ...<Widget>[
+          const SizedBox(height: AppSpace.s2),
+          Wrap(
+            spacing: AppSpace.s2,
+            runSpacing: AppSpace.s2,
+            children: <Widget>[
+              for (final _Choice<T> c in choices)
+                AppFilterChip(
+                  kind: AppFilterChipKind.toggle,
+                  label: c.label,
+                  selected: c.value == selected,
+                  onTap: enabled ? () => onChanged(c.value) : null,
+                ),
+            ],
+          ),
+        ],
+        if (helper != null) ...<Widget>[
+          const SizedBox(height: AppSpace.s1),
+          Text(
+            helper!,
+            style: theme.textTheme.bodySmall!.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ],
-      onChanged: (String id) => onChanged(id == _anyone ? null : id),
     );
   }
 }

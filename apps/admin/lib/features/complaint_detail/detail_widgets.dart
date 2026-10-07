@@ -95,10 +95,11 @@ class DetailSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final CampusColors colors = context.campusColors;
     return Container(
       padding: const EdgeInsets.all(AppSpace.s4),
       decoration: BoxDecoration(
-        color: context.campusColors.card,
+        color: colors.card,
         borderRadius: AppRadius.br4,
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
@@ -151,42 +152,45 @@ Future<void> showDetailPhotoViewer(
 }) {
   return showDialog<void>(
     context: context,
-    builder: (BuildContext dialogContext) => Dialog.fullscreen(
-      backgroundColor: dialogContext.campusColors.photoOverlayBackground,
-      child: Stack(
-        children: <Widget>[
-          Positioned.fill(
-            child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 4,
-              child: Center(
-                child: AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: Semantics(
-                    label: 'Photo of a ${category.label} problem',
-                    child: ComplaintPhoto(
-                      category: category,
-                      attachment: attachment,
+    builder: (BuildContext dialogContext) {
+      final CampusColors colors = dialogContext.campusColors;
+      return Dialog.fullscreen(
+        backgroundColor: colors.photoOverlayBackground,
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: Semantics(
+                      label: 'Photo of a ${category.label} problem',
+                      child: ComplaintPhoto(
+                        category: category,
+                        attachment: attachment,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: IconButton(
-                tooltip: 'Close photo',
-                color: dialogContext.campusColors.photoOverlayForeground,
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(dialogContext).pop(),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  tooltip: 'Close photo',
+                  color: colors.photoOverlayForeground,
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    ),
+          ],
+        ),
+      );
+    },
   );
 }
 

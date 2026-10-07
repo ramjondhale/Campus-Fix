@@ -1,6 +1,4 @@
-import 'package:campusfix_admin/app.dart' show noAutoRetry;
 import 'package:campusfix_admin/features/complaint_detail/assignment_panel.dart';
-import 'package:campusfix_admin/features/complaint_detail/complaint_detail_controller.dart';
 import 'package:campusfix_admin/features/complaint_detail/detail_widgets.dart';
 import 'package:campusfix_admin/features/complaint_detail/identity_panel.dart';
 import 'package:campusfix_admin/features/complaint_detail/manage_bar.dart';
@@ -650,5 +648,832 @@ void main() {
         ComplaintStatus.resolved,
       );
     });
+  });
+
+  group('actions end to end: dialog, service, screen', () {
+    testWidgets('Verify (verifier): confirm, then the screen shows Verified '
+        'and the verifier has nothing left to do', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+      );
+      await tapVisible(tester, barButton('Verify'));
+      expect(find.text('Verify the repair of $kResolvedIt?'), findsOneWidget);
+
+      await tester.tap(dialogButton('Verify'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDialog), findsNothing);
+      expect(find.text('Repair verified'), findsOneWidget, reason: 'toast');
+      expect(shownStatus(tester), ComplaintStatus.verified);
+      expect(barLabels(tester), isEmpty, reason: 'a verifier cannot close');
+      final Complaint c = await storedComplaint(tester, container, kResolvedIt);
+      expect(c.status, ComplaintStatus.verified);
+      expect(c.timeline.last.actorRole, UserRole.verifier);
+    });
+
+    testWidgets('Reject (verifier): the reason goes to the timeline and the '
+        'complaint returns to In Progress', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+      );
+      await tapVisible(tester, barButton('Reject — needs rework'));
+      await tester.enterText(dialogFields.last, 'The cable is still loose.');
+      await tester.pump();
+      await tester.tap(dialogButton('Reject'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sent back for rework'), findsOneWidget);
+      expect(shownStatus(tester), ComplaintStatus.inProgress);
+      expect(find.text('The cable is still loose.'), findsOneWidget);
+      expect(find.text('Rework'), findsOneWidget);
+      expect(
+        (await storedComplaint(tester, container, kResolvedIt)).status,
+        ComplaintStatus.inProgress,
+      );
+      // The verifier's timeline still has no actor identity.
+      expect(leaksIn(detailText(tester), allStaffSentinels()), isEmpty);
+    });
+
+    testWidgets('Close (admin): the complaint closes and becomes read-only', (
+      tester,
+    ) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kVerifiedCivil,
+      );
+      await tapVisible(tester, barButton('Close'));
+      expect(find.text('Close $kVerifiedCivil?'), findsOneWidget);
+      await tester.tap(dialogButton('Close complaint'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Complaint closed'), findsOneWidget);
+      expect(shownStatus(tester), ComplaintStatus.closed);
+      expect(find.text('This complaint is closed'), findsOneWidget);
+      expect(barLabels(tester), isEmpty);
+      expect(buttonIn('Set priority override'), findsNothing);
+      expect(
+        (await storedComplaint(tester, container, kVerifiedCivil)).status,
+        ComplaintStatus.closed,
+      );
+    });
+
+    testWidgets('Review & Route (admin): pre-set to the category\'s route, '
+        'an auto assignment', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kReportedPlumbing,
+      );
+      await tapVisible(tester, barButton('Review & Route'));
+      // The department choice is pre-set to the route of Plumbing.
+      expect(chipChosen(tester, 'Plumber'), isTrue);
+      expect(chipChosen(tester, 'Anyone in the department'), isTrue);
+      expect(chosenChips(tester), 2);
+
+      await tester.tap(dialogButton('Review and route'));
+      await tester.pumpAndSettle();
+
+      expect(shownStatus(tester), ComplaintStatus.assigned);
+      expect(find.text('Auto'), findsOneWidget);
+      final Complaint c = await storedComplaint(
+        tester,
+        container,
+        kReportedPlumbing,
+      );
+      expect(c.assignment!.department, Department.plumber);
+      expect(c.assignment!.isManual, isFalse);
+      // T1 and T2, both by the admin, both named on the admin timeline.
+      expect(c.timeline.map((e) => e.status).toList().sublist(1), <Object>[
+        ComplaintStatus.reviewed,
+        ComplaintStatus.assigned,
+      ]);
+      expect(find.text('Sandeep Kapoor · ADM-01'), findsNWidgets(3));
+    });
+
+    testWidgets('Review & Route (admin): another department makes it a '
+        'manual assignment', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kReportedPlumbing,
+      );
+      await tapVisible(tester, barButton('Review & Route'));
+      await chooseChip(tester, 'Civil Maintenance');
+      expect(
+        find.textContaining('makes this a manual assignment'),
+        findsOneWidget,
+      );
+      await tester.tap(dialogButton('Review and route'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manual'), findsOneWidget);
+      final Complaint c = await storedComplaint(
+        tester,
+        container,
+        kReportedPlumbing,
+      );
+      expect(c.assignment!.department, Department.civilMaintenance);
+      expect(c.assignment!.isManual, isTrue);
+    });
+
+    testWidgets('Review & Route (admin) on Other: nothing pre-set; without a '
+        'department it ends at Reviewed', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kReportedOther,
+      );
+      await tapVisible(tester, barButton('Review & Route'));
+      // Nothing is pre-set for Other: no department chosen.
+      expect(chosenChips(tester), 0);
+      expect(
+        dialogText(tester),
+        contains('This category has no default department.'),
+      );
+
+      await tester.tap(dialogButton('Review and route'));
+      await tester.pumpAndSettle();
+
+      expect(shownStatus(tester), ComplaintStatus.reviewed);
+      expect(find.text('Not assigned yet'), findsOneWidget);
+      expect(barLabels(tester), <String>['Assign'], reason: 'admin assigns');
+      expect(
+        (await storedComplaint(tester, container, kReportedOther)).assignment,
+        isNull,
+      );
+    });
+
+    testWidgets('Review & Route (verifier) on Other is confirm-only and '
+        'ends at Reviewed; a verifier cannot assign (AC-55)', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kReportedOther,
+      );
+      await tapVisible(tester, barButton('Review & Route'));
+      // Confirm-only: no department, no staff, no note field.
+      expect(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.byType(AppFilterChip),
+        ),
+        findsNothing,
+      );
+      expect(dialogFields, findsNothing);
+      expect(
+        dialogText(tester),
+        contains('This category has no default department'),
+      );
+
+      await tester.tap(dialogButton('Review and route'));
+      await tester.pumpAndSettle();
+
+      expect(shownStatus(tester), ComplaintStatus.reviewed);
+      expect(buttonIn('Assign'), findsNothing);
+      expect(find.textContaining('An admin assigns it'), findsOneWidget);
+      expect(
+        (await storedComplaint(tester, container, kReportedOther)).assignment,
+        isNull,
+      );
+    });
+
+    testWidgets('Assign (admin) a Safety complaint: department and staff '
+        'member, a manual assignment (AC-55)', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kReviewedSafety,
+      );
+      await tapVisible(tester, barButton('Assign'));
+      // Nothing pre-selected: the button waits for a department, and the
+      // staff choice for the department.
+      expect(chosenChips(tester), 0);
+      expect(dialogText(tester), contains('Choose a department first.'));
+      expect(isEnabled(tester, dialogButton('Assign')), isFalse);
+
+      await chooseChip(tester, 'Electrician');
+      expect(isEnabled(tester, dialogButton('Assign')), isTrue);
+      // The staff of that department only.
+      expect(dialogChip('Suresh Patil · MNT-ELE-01'), findsOneWidget);
+      expect(dialogChip('Ganesh Jadhav · MNT-ELE-02'), findsOneWidget);
+      expect(dialogChip('Mahesh Gaikwad · MNT-PLU-01'), findsNothing);
+      await chooseChip(tester, 'Suresh Patil · MNT-ELE-01');
+      await tester.tap(dialogButton('Assign'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Complaint assigned'), findsOneWidget);
+      expect(shownStatus(tester), ComplaintStatus.assigned);
+      expect(find.text('Suresh Patil · MNT-ELE-01'), findsOneWidget);
+      expect(find.text('Manual'), findsOneWidget);
+      final Complaint c = await storedComplaint(
+        tester,
+        container,
+        kReviewedSafety,
+      );
+      expect(c.assignment!.assigneeId, 'u-mnt-ele-01');
+    });
+
+    testWidgets('Reassign (admin): the reason is required; an unchanged '
+        'assignment is blocked inline, a real change goes through', (
+      tester,
+    ) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kAssignedCarpenter,
+      );
+      await tapVisible(tester, barButton('Reassign'));
+      expect(isEnabled(tester, dialogButton('Reassign')), isFalse);
+
+      // The same department and nobody in particular: no change.
+      await chooseChip(tester, 'Carpenter');
+      expect(isEnabled(tester, dialogButton('Reassign')), isFalse);
+      await tester.enterText(dialogFields.last, 'Try again');
+      await tester.pump();
+      expect(isEnabled(tester, dialogButton('Reassign')), isTrue);
+      await tester.tap(dialogButton('Reassign'));
+      await tester.pumpAndSettle();
+
+      // Blocked: the dialog stays, the rule's message is shown inline.
+      expect(find.byType(AppDialog), findsOneWidget);
+      expect(
+        dialogText(tester),
+        contains('Choose a different department or assignee.'),
+      );
+      expect(
+        (await storedComplaint(
+          tester,
+          container,
+          kAssignedCarpenter,
+        )).assignment!.department,
+        Department.carpenter,
+      );
+
+      await chooseChip(tester, 'Civil Maintenance');
+      await tester.tap(dialogButton('Reassign'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDialog), findsNothing);
+      expect(find.text('Complaint reassigned'), findsOneWidget);
+      expect(find.text('Civil Maintenance'), findsWidgets);
+      final Complaint c = await storedComplaint(
+        tester,
+        container,
+        kAssignedCarpenter,
+      );
+      expect(c.assignment!.department, Department.civilMaintenance);
+      expect(c.timeline.last.note, contains('Try again'));
+    });
+
+    testWidgets('Start work on behalf (admin)', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kAssignedCarpenter,
+      );
+      await tapVisible(tester, barButton('Start work on behalf'));
+      await tester.tap(dialogButton('Start work'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Work started'), findsOneWidget);
+      expect(shownStatus(tester), ComplaintStatus.inProgress);
+      expect(
+        (await storedComplaint(tester, container, kAssignedCarpenter)).status,
+        ComplaintStatus.inProgress,
+      );
+    });
+
+    testWidgets('Resolve on behalf (admin): after-photos and a note, the '
+        'same form as M-15', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kInProgressElectrical,
+      );
+      await tapVisible(tester, barButton('Resolve on behalf'));
+
+      expect(find.byType(PhotoUploader), findsOneWidget);
+      expect(isEnabled(tester, dialogButton('Mark resolved')), isFalse);
+      expect(
+        dialogText(tester),
+        contains('Add after-repair photo: at least 1 is required.'),
+      );
+
+      await tester.tap(find.text('Add a photo').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Take a photo (sample)'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 of 5'), findsOneWidget);
+      expect(isEnabled(tester, dialogButton('Mark resolved')), isFalse);
+
+      await tester.enterText(dialogFields.last, 'Replaced the breaker.');
+      await tester.pump();
+      expect(isEnabled(tester, dialogButton('Mark resolved')), isTrue);
+      await tester.tap(dialogButton('Mark resolved'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Marked as resolved'), findsOneWidget);
+      expect(shownStatus(tester), ComplaintStatus.resolved);
+      expect(find.text('Replaced the breaker.'), findsWidgets);
+      final Complaint c = await storedComplaint(
+        tester,
+        container,
+        kInProgressElectrical,
+      );
+      expect(c.afterPhotos, hasLength(1));
+      expect(c.afterPhotos.single.kind, AttachmentKind.afterPhoto);
+      // The next step is the verifier's, offered to the admin too.
+      expect(barLabels(tester), <String>['Verify', 'Reject — needs rework']);
+    });
+
+    testWidgets('in flight: the buttons wait, and there is no double '
+        'submit', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+        latency: const Duration(milliseconds: 50),
+      );
+      await tapVisible(tester, barButton('Verify'));
+
+      await tester.tap(dialogButton('Verify'));
+      await tester.pump();
+      // Sending: the button shows its spinner, Cancel and the bar wait.
+      expect(tester.widget<AppButton>(dialogButton('Verify')).loading, isTrue);
+      expect(isEnabled(tester, dialogButton('Cancel')), isFalse);
+      expect(isEnabled(tester, barButton('Reject — needs rework')), isFalse);
+      // A second tap on the spinning button is ignored.
+      await tester.tap(dialogButton('Verify'), warnIfMissed: false);
+      await tester.pump();
+
+      await tester.pumpAndSettle();
+      expect(find.byType(AppDialog), findsNothing);
+      final Complaint c = await storedComplaint(tester, container, kResolvedIt);
+      expect(
+        c.timeline.where((e) => e.status == ComplaintStatus.verified),
+        hasLength(1),
+      );
+    });
+
+    testWidgets('stale: another admin changed the complaint while the dialog '
+        'was open (P8)', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+      );
+      await tapVisible(tester, barButton('Verify'));
+      // Somebody else verifies it first.
+      await writeComplaint(
+        tester,
+        container,
+        seed(kResolvedIt).copyWith(status: ComplaintStatus.verified),
+      );
+
+      await tester.tap(dialogButton('Verify'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDialog), findsOneWidget);
+      expect(dialogText(tester), contains('This complaint changed'));
+      expect(find.text('Refresh'), findsOneWidget);
+      // Nothing was applied by this attempt.
+      expect(
+        (await storedComplaint(tester, container, kResolvedIt)).timeline.length,
+        seed(kResolvedIt).timeline.length,
+      );
+
+      await tester.tap(find.text('Refresh'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppDialog), findsNothing);
+      expect(shownStatus(tester), ComplaintStatus.verified);
+    });
+
+    testWidgets('a failed write keeps the dialog and its input and offers '
+        'the same button again', (tester) async {
+      await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+        overrides: <Override>[
+          complaintRepositoryProvider.overrideWith(
+            (ref) =>
+                FailingWritesComplaintRepository(initial: testSeed.complaints),
+          ),
+        ],
+      );
+      await tapVisible(tester, barButton('Reject — needs rework'));
+      await tester.enterText(dialogFields.last, 'Needs another look');
+      await tester.pump();
+      await tester.tap(dialogButton('Reject'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDialog), findsOneWidget);
+      expect(dialogText(tester), contains("Couldn't complete this action"));
+      expect(dialogText(tester), contains("We couldn't send the job back."));
+      expect(isEnabled(tester, dialogButton('Reject')), isTrue);
+      expect(find.text('Needs another look'), findsOneWidget);
+      expect(shownStatus(tester), ComplaintStatus.resolved);
+    });
+  });
+
+  group('AC-54 priority override and safety flag (admin)', () {
+    testWidgets('setting an override changes the effective priority on this '
+        'screen, not the computed one; clearing restores it', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kReportedPlumbing,
+      );
+      // The public feeds are only live while something listens (the list
+      // under the detail is paused): listen like A-02 / A-03 would.
+      final ProviderSubscription<AsyncValue<List<PublicComplaintView>>> feed =
+          container.listen(allComplaintsProvider, (_, _) {});
+      addTearDown(feed.close);
+      final Complaint before = seed(kReportedPlumbing);
+      expect(before.priority, Priority.medium);
+      expect(headerPriority(tester), (
+        priority: Priority.medium,
+        overridden: false,
+      ));
+      expect(find.byType(OverriddenMarker), findsNothing);
+
+      await tapVisible(tester, buttonIn('Set priority override'));
+      // Unchanged: nothing to apply yet.
+      expect(isEnabled(tester, dialogButton('Clear override')), isFalse);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.text('Critical'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // The dialog previews the resulting priority.
+      expect(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.byType(PriorityTag),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(dialogButton('Set override'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Priority updated'), findsOneWidget);
+      expect(headerPriority(tester), (
+        priority: Priority.critical,
+        overridden: true,
+      ));
+      expect(find.byType(OverriddenMarker), findsNWidgets(2));
+      // The panel still shows the computed priority, unchanged.
+      final List<Priority> panel = <Priority>[
+        for (final PriorityTag t in tester.widgetList<PriorityTag>(
+          find.descendant(
+            of: find.byType(PriorityPanel),
+            matching: find.byType(PriorityTag),
+          ),
+        ))
+          t.priority,
+      ];
+      expect(panel, <Priority>[
+        Priority.critical, // effective
+        Priority.medium, // computed
+        Priority.critical, // override
+      ]);
+      final Complaint stored = await storedComplaint(
+        tester,
+        container,
+        kReportedPlumbing,
+      );
+      expect(stored.priority, before.priority);
+      expect(stored.priorityOverride, Priority.critical);
+      // ... and the public feeds (A-02 / A-03 / M-11) carry it.
+      final List<PublicComplaintView> all = container
+          .read(allComplaintsProvider)
+          .requireValue;
+      expect(
+        all.firstWhere((v) => v.id == kReportedPlumbing).effectivePriority,
+        Priority.critical,
+      );
+
+      // Clear it again.
+      await tapVisible(tester, buttonIn('Change priority override'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.text('No override'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(dialogButton('Clear override'));
+      await tester.pumpAndSettle();
+
+      expect(headerPriority(tester), (
+        priority: Priority.medium,
+        overridden: false,
+      ));
+      expect(find.byType(OverriddenMarker), findsNothing);
+      final Complaint cleared = await storedComplaint(
+        tester,
+        container,
+        kReportedPlumbing,
+      );
+      expect(cleared.priorityOverride, isNull);
+      expect(cleared.priority, before.priority);
+    });
+
+    testWidgets('an existing override shows the marker, and clearing it '
+        'restores the computed priority', (tester) async {
+      await openDetail(tester, UserRole.admin, kAssignedOverridden);
+      expect(headerPriority(tester), (
+        priority: Priority.high,
+        overridden: true,
+      ));
+
+      await tapVisible(tester, buttonIn('Change priority override'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.text('No override'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(dialogButton('Clear override'));
+      await tester.pumpAndSettle();
+
+      expect(headerPriority(tester), (
+        priority: Priority.medium,
+        overridden: false,
+      ));
+    });
+
+    testWidgets('the safety flag recomputes the priority, and comes off '
+        'again', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kReportedPlumbing,
+      );
+      await tapVisible(tester, buttonIn('Flag as safety issue'));
+      await tester.tap(dialogButton('Flag as safety issue'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Safety flag updated'), findsOneWidget);
+      expect(find.text('Flagged'), findsOneWidget);
+      expect(
+        headerPriority(tester).priority.weight,
+        greaterThanOrEqualTo(Priority.high.weight),
+      );
+      expect(
+        (await storedComplaint(
+          tester,
+          container,
+          kReportedPlumbing,
+        )).safetyFlag,
+        isTrue,
+      );
+
+      await tapVisible(tester, buttonIn('Remove safety flag'));
+      await tester.tap(dialogButton('Remove flag'));
+      await tester.pumpAndSettle();
+      expect(find.text('Not flagged'), findsOneWidget);
+      expect(headerPriority(tester).priority, Priority.medium);
+    });
+  });
+
+  group('states (G-3, G-4, G-6)', () {
+    testWidgets('loading: a skeleton for both roles', (tester) async {
+      for (final UserRole role in <UserRole>[
+        UserRole.admin,
+        UserRole.verifier,
+      ]) {
+        await openDetail(
+          tester,
+          role,
+          kResolvedIt,
+          overrides: <Override>[
+            complaintRepositoryProvider.overrideWithValue(
+              StalledComplaintRepository(),
+            ),
+          ],
+        );
+        expect(find.byType(DetailSkeleton), findsOneWidget, reason: role.name);
+        expect(find.byType(ManageBar), findsNothing);
+        expect(find.text('Reveal reporter identity'), findsNothing);
+      }
+    });
+
+    testWidgets('error with Retry (admin), then the screen', (tester) async {
+      // The dashboard behind the sign-in takes the first failed read, the
+      // detail the second.
+      final FlakyComplaintRepository repo = FlakyComplaintRepository(
+        initial: testSeed.complaints,
+        failures: 2,
+      );
+      await openDetail(
+        tester,
+        UserRole.admin,
+        kResolvedIt,
+        overrides: <Override>[
+          complaintRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+
+      expect(find.text("Couldn't load this complaint"), findsOneWidget);
+      expect(find.byType(ManageBar), findsNothing);
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("Couldn't load this complaint"), findsNothing);
+      expect(find.text(kResolvedIt), findsOneWidget);
+      expect(find.text('Reveal reporter identity'), findsOneWidget);
+    });
+
+    testWidgets('error with Retry (verifier), then the screen', (tester) async {
+      final FlakyComplaintRepository repo = FlakyComplaintRepository(
+        initial: testSeed.complaints,
+        failures: 1,
+      );
+      await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+        overrides: <Override>[
+          complaintRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+
+      expect(find.text("Couldn't load this complaint"), findsOneWidget);
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(kResolvedIt), findsOneWidget);
+      expect(barLabels(tester), <String>['Verify', 'Reject — needs rework']);
+    });
+
+    testWidgets('E-404 for an unknown ID, the same for both roles, with Go '
+        'home', (tester) async {
+      for (final UserRole role in <UserRole>[
+        UserRole.admin,
+        UserRole.verifier,
+      ]) {
+        final ProviderContainer container = await openDetail(
+          tester,
+          role,
+          'CF-2026-99999',
+        );
+        expect(find.text("We couldn't find that complaint"), findsOneWidget);
+        expect(find.byType(ManageBar), findsNothing);
+        expect(find.byType(IdentityPanel), findsNothing);
+
+        await tester.tap(find.text('Go home'));
+        await tester.pumpAndSettle();
+        expect(
+          container.read(appRouterProvider).state.uri.path,
+          AppRoutes.dashboard,
+        );
+      }
+    });
+
+    testWidgets('a complaint that turns closed while open becomes '
+        'read-only live', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        kVerifiedCivil,
+      );
+      expect(barLabels(tester), <String>['Close']);
+      await writeComplaint(
+        tester,
+        container,
+        seed(kVerifiedCivil).copyWith(status: ComplaintStatus.closed),
+      );
+      expect(find.text('This complaint is closed'), findsOneWidget);
+      expect(barLabels(tester), isEmpty);
+    });
+  });
+
+  group('navigation (A-03 <-> A-04)', () {
+    testWidgets('Back returns to the list with its filters', (tester) async {
+      final ProviderContainer container = await pumpAdmin(tester);
+      await signInAs(tester, UserRole.admin);
+      const String url =
+          '/complaints?unresolved=1&priority=critical,high&created=all';
+      await openRoute(tester, container, url);
+
+      await tester.tap(find.text('CF-2026-00027'));
+      await tester.pumpAndSettle();
+      expect(
+        container.read(appRouterProvider).state.uri.toString(),
+        AppRoutes.complaint('CF-2026-00027'),
+        reason: 'the detail URL carries the ID only',
+      );
+
+      await tester.tap(buttonIn('Back to complaints'));
+      await tester.pumpAndSettle();
+      expect(container.read(appRouterProvider).state.uri.toString(), url);
+    });
+
+    testWidgets('a direct link has a list to go back to', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+      );
+      await tester.tap(buttonIn('Back to complaints'));
+      await tester.pumpAndSettle();
+      expect(
+        container.read(appRouterProvider).state.uri.path,
+        AppRoutes.complaints,
+      );
+    });
+  });
+
+  group('privacy sweeps (R5, PV-4, PV-5)', () {
+    testWidgets('verifier: no reporter and no staff identity on any '
+        'complaint', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        testSeed.complaints.first.id,
+      );
+      for (final Complaint c in testSeed.complaints) {
+        await openRoute(tester, container, AppRoutes.complaint(c.id));
+        expect(find.text(c.id), findsOneWidget, reason: c.id);
+        final String text = detailText(tester);
+        expect(leaksIn(text, allReporterSentinels()), isEmpty, reason: c.id);
+        expect(leaksIn(text, allStaffSentinels()), isEmpty, reason: c.id);
+        expect(find.byType(IdentityPanel), findsNothing);
+      }
+    });
+
+    testWidgets('admin: no reporter identity on any complaint until Reveal', (
+      tester,
+    ) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.admin,
+        testSeed.complaints.first.id,
+      );
+      for (final Complaint c in testSeed.complaints) {
+        await openRoute(tester, container, AppRoutes.complaint(c.id));
+        expect(find.text(c.id), findsOneWidget, reason: c.id);
+        expect(
+          leaksIn(detailText(tester), allReporterSentinels()),
+          isEmpty,
+          reason: c.id,
+        );
+        expect(find.text('Reveal reporter identity'), findsOneWidget);
+      }
+    });
+
+    testWidgets('the dialogs hold no identity either', (tester) async {
+      await openDetail(tester, UserRole.verifier, kResolvedIt);
+      await tapVisible(tester, barButton('Reject — needs rework'));
+      expect(leaksIn(dialogText(tester), allReporterSentinels()), isEmpty);
+      expect(leaksIn(dialogText(tester), allStaffSentinels()), isEmpty);
+    });
+  });
+
+  group('responsive layout', () {
+    for (final Size size in const <Size>[
+      Size(1440, 900),
+      Size(1100, 800),
+      Size(800, 900),
+      Size(480, 900),
+    ]) {
+      testWidgets('lays out without overflow at ${size.width.toInt()} px', (
+        tester,
+      ) async {
+        for (final UserRole role in <UserRole>[
+          UserRole.admin,
+          UserRole.verifier,
+        ]) {
+          final ProviderContainer container = await openDetail(
+            tester,
+            role,
+            kResolvedIt,
+            size: size,
+          );
+          expect(tester.takeException(), isNull, reason: role.name);
+          await tapVisible(tester, find.widgetWithText(AppButton, 'Verify'));
+          expect(tester.takeException(), isNull, reason: 'dialog');
+          await tester.tap(dialogButton('Cancel'));
+          await tester.pumpAndSettle();
+          if (role == UserRole.admin) {
+            await openRoute(
+              tester,
+              container,
+              AppRoutes.complaint(kInProgressManual),
+            );
+            expect(tester.takeException(), isNull);
+          }
+        }
+      });
+    }
   });
 }

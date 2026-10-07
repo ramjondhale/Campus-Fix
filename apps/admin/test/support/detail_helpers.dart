@@ -155,3 +155,56 @@ List<String> leaksIn(String text, Iterable<String> sentinels) {
       if (hay.contains(s.toLowerCase())) s,
   }.toList();
 }
+
+/// The chip labelled [label] in the open dialog (a department or staff
+/// choice).
+Finder dialogChip(String label) => find.descendant(
+  of: find.byType(AppDialog),
+  matching: find.widgetWithText(AppFilterChip, label),
+);
+
+/// Chooses the chip [label] of the open dialog.
+Future<void> chooseChip(WidgetTester tester, String label) async {
+  await tester.ensureVisible(dialogChip(label));
+  await tester.pumpAndSettle();
+  await tester.tap(dialogChip(label));
+  await tester.pumpAndSettle();
+}
+
+/// Whether the chip [label] of the open dialog is the chosen one.
+bool chipChosen(WidgetTester tester, String label) =>
+    tester.widget<AppFilterChip>(dialogChip(label)).selected;
+
+/// How many department / staff chips of the open dialog are chosen.
+int chosenChips(WidgetTester tester) => tester
+    .widgetList<AppFilterChip>(
+      find.descendant(
+        of: find.byType(AppDialog),
+        matching: find.byType(AppFilterChip),
+      ),
+    )
+    .where((AppFilterChip c) => c.selected)
+    .length;
+
+/// The text fields of the open dialog.
+Finder get dialogFields => find.descendant(
+  of: find.byType(AppDialog),
+  matching: find.byType(EditableText),
+);
+
+/// Every string the open dialog renders.
+String dialogText(WidgetTester tester) =>
+    allRenderedText(tester, within: find.byType(AppDialog));
+
+/// The status the header's badge shows.
+ComplaintStatus shownStatus(WidgetTester tester) =>
+    tester.widget<StatusBadge>(find.byType(StatusBadge)).status;
+
+/// The effective priority the header's tag shows (the first tag on the page),
+/// and whether it carries the Overridden marker.
+({Priority priority, bool overridden}) headerPriority(WidgetTester tester) {
+  final PriorityTag tag = tester
+      .widgetList<PriorityTag>(find.byType(PriorityTag))
+      .first;
+  return (priority: tag.priority, overridden: tag.overridden);
+}

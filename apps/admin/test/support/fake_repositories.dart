@@ -19,6 +19,16 @@ class FlakyComplaintRepository extends MockComplaintRepository {
   }
 }
 
+/// A complaint repository whose writes always fail (to show the "couldn't"
+/// result of an action while reads keep working).
+class FailingWritesComplaintRepository extends MockComplaintRepository {
+  FailingWritesComplaintRepository({required super.initial});
+
+  @override
+  Future<Complaint> update(Complaint c) =>
+      Future<Complaint>.error(StateError('simulated outage'));
+}
+
 /// A complaint repository whose first read never completes (loading state).
 class StalledComplaintRepository extends MockComplaintRepository {
   final Completer<List<Complaint>> never = Completer<List<Complaint>>();
