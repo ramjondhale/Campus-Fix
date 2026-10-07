@@ -5,7 +5,7 @@ College-only complaint & maintenance app. **Flutter mobile + Flutter Web admin**
 [docs/RUN-LEDGER.md](docs/RUN-LEDGER.md) (the resume point) and [docs/PLAN.md](docs/PLAN.md).
 
 ## Repo layout
-- `packages/campusfix_core` — pure Dart: models, 8 enums, logic (priority engine, status machine,
+- `packages/campusfix_core` — pure Dart: models, 11 enums, logic (priority engine, status machine,
   assignment, privacy projections), mock repos + seed data, `ComplaintService`/`NotificationService`.
   **Complete, 651 tests.**
 - `packages/campusfix_design` — theme (tokens, `AppTheme.light/dark`, `ThemeExtension`s) + ~29 reusable

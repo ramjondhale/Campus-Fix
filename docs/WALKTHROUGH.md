@@ -39,7 +39,7 @@ requirement list (R1 to R18).
 |---|---|---|---|
 | Mobile app | [`apps/mobile`](../apps/mobile) | Flutter app for **reporters, maintenance staff and verifiers** (all three role flows are complete). | 199 |
 | Admin web console | [`apps/admin`](../apps/admin) | Flutter **Web** console for **admins and verifiers**: login, dashboard, complaint list, complaint detail and manage. | 344 |
-| Core | [`packages/campusfix_core`](../packages/campusfix_core) | Pure Dart (no Flutter): models, 9 enums (the original 8 plus `NotificationType`), the priority engine, status machine, assignment router, privacy projections, repository interfaces, in-memory mock repositories, seed data, `ComplaintService` and `NotificationService`. | 651 |
+| Core | [`packages/campusfix_core`](../packages/campusfix_core) | Pure Dart (no Flutter): models, 11 enums, the priority engine, status machine, assignment router, privacy projections, repository interfaces, in-memory mock repositories, seed data, `ComplaintService` and `NotificationService`. | 651 |
 | Design system | [`packages/campusfix_design`](../packages/campusfix_design) | Theme (tokens, `AppTheme.light/dark`, `ThemeExtension`s), about 29 reusable widgets and a widget gallery. PII-free. | 224 |
 
 Dependency direction is acyclic: `campusfix_core` <- `campusfix_design` <- the two apps. Both apps use

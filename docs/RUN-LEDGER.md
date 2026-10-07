@@ -62,7 +62,7 @@ _Last updated: 2026-10-07 — by orchestrator._
   app agents in the **foreground** works reliably (S4.1 succeeded that way) but forces **serial** execution
   (no ≤4 parallel for now). Revert to parallel background when the stream recovers.
 - **Trunk:** `main` (agent branches `agent/<chunk-id>` cut from it).
-- **Baseline:** **`campusfix_core` COMPLETE — 651 tests green, analyze clean** (models, 8 enums, views,
+- **Baseline:** **`campusfix_core` COMPLETE — 651 tests green, analyze clean** (models, 11 enums, views,
   priority engine, status machine + validateTransition, assignment, privacy, mock repos + seed [29
   complaints/25 users/226 notifs], ComplaintService + NotificationService). Design system published.
 - **Next action:** Wave 5 — S4.1 (mobile app shell: go_router + Riverpod + mock ID/password login +
@@ -99,9 +99,9 @@ _Last updated: 2026-10-07 — by orchestrator._
 | S5.2 Dashboard | ✅ | A | merged | 0a95a26 | A-02: 8 MetricCards (partition invariant 7+4+6+7+5=29 holds), 3 MetricBarRow breakdown charts (status/priority/category) + token-driven 14-day intake chart, 3 triage lists, AppSegmented date range (7/30/90/All), card/chart/row→A-03 presets (AC-47 exact: Critical/High→unresolved=1&priority=critical,high). Identity-free (public views+aggregates). 127 admin tests, core 651, analyze clean, web build ✓. Defines complaint_query.dart URL contract for S5.3. |
 | S5.3 Complaint list + filters | ✅ | A | merged | 364d6ff | A-03: design `ComplaintTable` (8 public cols, no reporter) + composed `FilterBar` (status/priority/category/department+Unassigned/building/created-range/unresolved+triage toggles/search/Reset) + sort (default: priority-weight desc then longest-waiting, AC-50) + pagination (25/50). Full URL round-trip (filter+sort+page+size); ~50 dashboard preset URLs match byte-for-byte; Critical/High→exactly 9 rows end-to-end (AC-47/49). Identity-free (AC-48). 243 admin tests, core 651, analyze clean, web build ✓. |
 | S5.4 Complaint management | ✅ | A | merged | 4eafee6 | A-04 detail/manage. A: AdminComplaintView + collapsed-by-default identity reveal (LK-8: explicit reveal, re-collapse on nav/sign-out, never in URL/title, no copy/export), priority/assignment/full-actor timeline panels, all 10 manage actions (review&route, assign, reassign, start/resolve on behalf, verify, close[A-only], reject, priority override, safety toggle) gated by nextStatuses+preconditions. V: public view only, no identity/assignee/priority-input/Close, public timeline. AC-51..55 covered. Admin guard extended (exact allow-list: complaint_detail/ + identity_panel.dart). 344 admin tests, core 651, analyze clean, web build ✓. Worked around AppSelect bug with toggle chips. |
-| S6.1 Integrate + build + smoke | ⬜ | O | | | merge all + screenshots. |
-| S6.2 Walkthrough + cleanup | ⬜ | O | | | WALKTHROUGH.md + tidy. |
-| S6.3 Phase-2 Firebase plan | ⬜ | O | | | backend build plan. |
+| S6.1 Integrate + build + smoke | ✅ | O | main | 60e9f0c | All chunks merged; final gate green — core 651 / design 224 / mobile 199 / admin 344 (=1418); analyze clean; admin `flutter build web` ✓; dashboard verified live. iOS build still blocked (BUILDING.md). |
+| S6.2 Walkthrough + cleanup | 🟡 | O | main | 60e9f0c | WALKTHROUGH.md ✅. Doc cleanup pending (user decision). |
+| S6.3 Phase-2 Firebase plan | ✅ | O | main | 60e9f0c | docs/phase-2-firebase-plan.md (repo-interface seams → Firebase; Firestore + security rules enforcing the privacy model; identity-reveal audit log; FCM; rollout). |
 
 ## Design system
 - **Published Artifact (style guide):** https://claude.ai/artifact/X521FrUxyrBpwzuus8xUyQ ("CampusFix
@@ -151,6 +151,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | 19 | 2026-10-07 | 0a95a26 | S5.2 admin dashboard merged (A-02 cards/charts/lists/date-range + A-03 query contract); 127 admin tests, core 651 green, analyze clean, web build ✓. |
 | 20 | 2026-10-07 | 364d6ff | S5.3 admin complaint list merged (A-03 table/filters/sort/pagination/URL-sync; dashboard presets round-trip); 243 admin tests, core 651 green, analyze clean, web build ✓. |
 | 21 | 2026-10-07 | 4eafee6 | S5.4 admin detail/manage + admin-only identity reveal merged (A-04; all manage actions; A/V split; guard extended). 344 admin tests, core 651 green, analyze clean, web build ✓. **ALL build chunks complete — only S6 remains.** |
+| 22 | 2026-10-07 | 60e9f0c | S6 docs merged (WALKTHROUGH.md + phase-2-firebase-plan.md). Final integration gate green: core 651 / design 224 / mobile 199 / admin 344 = 1418 tests. Enum-count docs corrected (11). S6.1/S6.3 ✅; S6.2 cleanup pending user decision. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
