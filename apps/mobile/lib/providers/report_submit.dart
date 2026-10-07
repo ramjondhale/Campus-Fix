@@ -113,7 +113,8 @@ class ReportSubmitNotifier extends Notifier<ReportSubmitState> {
       state = ReportSubmitState(
         status: ReportSubmitStatus.failed,
         last: state.last,
-        error: "We couldn't submit your report. Check your connection and "
+        error:
+            "We couldn't submit your report. Check your connection and "
             'try again. Nothing you entered was lost.',
       );
       return null;

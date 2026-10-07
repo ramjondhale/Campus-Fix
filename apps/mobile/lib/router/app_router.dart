@@ -14,7 +14,9 @@ import '../features/report/category_step.dart';
 import '../features/report/location_step.dart';
 import '../features/report/photos_step.dart';
 import '../features/report/report_flow.dart';
-import '../features/report/report_stub_screen.dart';
+import '../features/report/confirmation_screen.dart';
+import '../features/report/details_step.dart';
+import '../features/report/review_step.dart';
 import '../features/verify/verify_screens.dart';
 import '../features/work/work_screens.dart';
 import '../providers/providers.dart';
@@ -197,20 +199,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.reportDetails,
-        builder: (context, state) => _guard(
-          _reporter,
-          const ReportStubScreen(title: 'Description & impact'),
-        ),
+        builder: (context, state) =>
+            _guard(_reporter, DetailsStep(edit: isEditMode(state))),
       ),
       GoRoute(
         path: AppRoutes.reportReview,
-        builder: (context, state) =>
-            _guard(_reporter, const ReportStubScreen(title: 'Review')),
+        builder: (context, state) => _guard(_reporter, const ReviewStep()),
       ),
       GoRoute(
         path: '/report/done/:id',
         builder: (context, state) =>
-            _guard(_reporter, const ReportStubScreen(title: 'Confirmation')),
+            _guard(_reporter, ReportConfirmationScreen(complaintId: id(state))),
       ),
     ],
   );
