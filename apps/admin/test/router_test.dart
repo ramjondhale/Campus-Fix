@@ -139,10 +139,7 @@ void main() {
 
     await signInAs(tester, UserRole.admin);
     expect(router.state.uri.path, AppRoutes.complaint(id));
-    expect(
-      find.byType(ComplaintDetailScreen),
-      findsOneWidget,
-    );
+    expect(find.byType(ComplaintDetailScreen), findsOneWidget);
     expect(find.text(_loginSubtitle), findsNothing);
   });
 
@@ -217,10 +214,7 @@ void main() {
       for (final (String path, Finder body) in <(String, Finder)>[
         (AppRoutes.dashboard, find.text('Status breakdown')),
         (AppRoutes.complaints, find.byType(ComplaintListScreen)),
-        (
-          AppRoutes.complaint(id),
-          find.byType(ComplaintDetailScreen),
-        ),
+        (AppRoutes.complaint(id), find.byType(ComplaintDetailScreen)),
       ]) {
         router.go(path);
         await tester.pumpAndSettle();

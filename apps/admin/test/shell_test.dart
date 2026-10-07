@@ -110,10 +110,7 @@ void main() {
       expect(find.byType(AdminSideNav), findsOneWidget);
       expect(sideNav(tester).selectedIndex, 1);
       expect(inTopBar('Complaint details'), findsOneWidget);
-      expect(
-        find.byType(ComplaintDetailScreen),
-        findsOneWidget,
-      );
+      expect(find.byType(ComplaintDetailScreen), findsOneWidget);
 
       // The side nav still navigates away from the detail.
       await tester.tap(inNav('Dashboard'));

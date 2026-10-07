@@ -1172,10 +1172,7 @@ void main() {
       await tapAndSettle(tester, find.text(id));
       expect(location(container), AppRoutes.complaint(id));
       expect(Uri.parse(location(container)).query, isEmpty);
-      expect(
-        find.byType(ComplaintDetailScreen),
-        findsOneWidget,
-      );
+      expect(find.byType(ComplaintDetailScreen), findsOneWidget);
     });
 
     testWidgets('Back returns to the same filters, sort and page, with the '
