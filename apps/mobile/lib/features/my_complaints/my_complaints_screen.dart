@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../report/report_problem_fab.dart';
 import '../shared/coming_soon_screen.dart';
 
 /// Stub for M-09 My Complaints / Status (built in S4.3). A bottom-nav tab.
@@ -11,5 +12,6 @@ class MyComplaintsScreen extends StatelessWidget {
     title: 'My Complaints',
     icon: Icons.list_alt_outlined,
     showBack: false,
+    floatingActionButton: ReportProblemFab(),
   );
 }

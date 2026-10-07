@@ -22,6 +22,7 @@ class ComingSoonScreen extends StatelessWidget {
     required this.title,
     this.icon = Icons.construction_outlined,
     this.showBack = true,
+    this.floatingActionButton,
   });
 
   /// The feature's screen title (top bar and message).
@@ -33,9 +34,13 @@ class ComingSoonScreen extends StatelessWidget {
   /// the bottom navigation).
   final bool showBack;
 
+  /// An optional floating action (e.g. "Report a Problem").
+  final Widget? floatingActionButton;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: floatingActionButton,
       appBar: AppTopBar.page(
         title: title,
         onBack: showBack ? () => popOrHome(context) : null,

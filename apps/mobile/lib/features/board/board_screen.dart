@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../report/report_problem_fab.dart';
 import '../shared/coming_soon_screen.dart';
 
 /// Stub for M-11 Campus Problem Board (built in S4.4). A bottom-nav tab.
@@ -11,6 +12,7 @@ class BoardScreen extends StatelessWidget {
     title: 'Campus Board',
     icon: Icons.view_kanban_outlined,
     showBack: false,
+    floatingActionButton: ReportProblemFab(),
   );
 }
 
