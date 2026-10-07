@@ -61,7 +61,8 @@ class _ForwardToBoardItemState extends State<_ForwardToBoardItem> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.pushReplacement(AppRoutes.boardItem(widget.complaintId));
+      if (!mounted) return;
+      context.pushReplacement(AppRoutes.boardItem(widget.complaintId));
     });
   }
 

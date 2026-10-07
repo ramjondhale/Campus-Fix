@@ -296,7 +296,8 @@ class _Photos extends StatelessWidget {
   Widget build(BuildContext context) {
     final PublicComplaintView c = complaint;
     final bool hasAfter = c.afterPhotos.isNotEmpty;
-    final bool compare = showComparison && hasAfter && c.beforePhotos.isNotEmpty;
+    final bool compare =
+        showComparison && hasAfter && c.beforePhotos.isNotEmpty;
     if (c.beforePhotos.isEmpty && !hasAfter) return const SizedBox.shrink();
     return _Card(
       title: 'Photos',
@@ -306,7 +307,9 @@ class _Photos extends StatelessWidget {
           if (compare) ...<Widget>[
             Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: BeforeAfter.maxWidth),
+                constraints: const BoxConstraints(
+                  maxWidth: BeforeAfter.maxWidth,
+                ),
                 child: BeforeAfter(
                   category: c.category,
                   before: c.beforePhotos.first,
@@ -369,7 +372,8 @@ class _Gallery extends StatelessWidget {
                 category: category,
                 attachment: photos[i],
                 size: PhotoThumbnailSize.s100,
-                semanticLabel: '$label photo ${i + 1} of ${photos.length}. '
+                semanticLabel:
+                    '$label photo ${i + 1} of ${photos.length}. '
                     'Open full screen',
                 onTap: () => showComplaintPhotoViewer(
                   context,

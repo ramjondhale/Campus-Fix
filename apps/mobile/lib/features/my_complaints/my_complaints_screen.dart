@@ -133,7 +133,8 @@ class _MyComplaintsScreenState extends ConsumerState<MyComplaintsScreen> {
               AppSegmented<MyComplaintsSegment>(
                 semanticLabel: 'Show complaints',
                 segments: <AppSegment<MyComplaintsSegment>>[
-                  for (final MyComplaintsSegment s in MyComplaintsSegment.values)
+                  for (final MyComplaintsSegment s
+                      in MyComplaintsSegment.values)
                     AppSegment<MyComplaintsSegment>(value: s, label: s.label),
                 ],
                 selected: _segment,
