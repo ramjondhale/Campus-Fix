@@ -63,14 +63,18 @@ void main() {
         .toList();
     expect(tiles.length, mine.length);
     expect(
-      <String>[for (final t in tiles) t.notification.id],
-      <String>[
-        for (final n in <AppNotification>[
-          ...mine,
-        ]..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
-          n.id,
-      ],
+      <String>{for (final t in tiles) t.notification.id},
+      <String>{for (final n in mine) n.id},
     );
+    // Newest first.
+    for (int i = 1; i < tiles.length; i++) {
+      expect(
+        tiles[i].notification.createdAt.isAfter(
+          tiles[i - 1].notification.createdAt,
+        ),
+        isFalse,
+      );
+    }
     // Only this user's feed.
     expect(
       tiles.every(
@@ -218,18 +222,53 @@ void main() {
       AppRoutes.notifications,
     );
 
-    final AppNotification there = feed.firstWhere(
-      (n) => reachable.contains(n.complaintId),
+    // A new assignment for work that is in the queue opens its screen.
+    final AppUser me = demoAccount(UserRole.maintenance).user;
+    final Complaint fresh = testSeed.complaints.firstWhere(
+      (c) => c.status == ComplaintStatus.reported,
     );
+    await container
+        .read(complaintRepositoryProvider)
+        .update(
+          fresh.copyWith(
+            status: ComplaintStatus.assigned,
+            assignment: Assignment(
+              department: me.department!,
+              assignedBy: 'test',
+              assignedAt: DateTime.now(),
+              isManual: false,
+            ),
+          ),
+        );
+    await tester.pumpAndSettle();
+    final String queued = fresh.id;
+    expect(
+      container.read(workQueueProvider).requireValue.toStart.map((c) => c.id),
+      contains(queued),
+    );
+    await container
+        .read(notificationRepositoryProvider)
+        .add(
+          AppNotification(
+            id: 'ntf-test-queued',
+            recipientId: me.id,
+            complaintId: queued,
+            type: NotificationType.assignment,
+            title: 'New work assigned',
+            body: 'Complaint $queued assigned to Electrician.',
+            createdAt: DateTime.now(),
+          ),
+        );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byWidgetPredicate(
-        (w) => w is NotificationTile && w.notification.id == there.id,
+        (w) => w is NotificationTile && w.notification.id == 'ntf-test-queued',
       ),
     );
     await tester.pumpAndSettle();
     expect(
       container.read(appRouterProvider).state.uri.path,
-      AppRoutes.workItem(there.complaintId),
+      AppRoutes.workItem(queued),
     );
   });
 

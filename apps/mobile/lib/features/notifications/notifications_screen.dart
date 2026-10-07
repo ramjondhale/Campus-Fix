@@ -33,43 +33,15 @@ NotificationGroups groupNotifications(
   return NotificationGroups(today: today, earlier: earlier);
 }
 
-/// The route [role] opens for a notification about [complaintId], or `null`
-/// when the complaint is no longer reachable from that role's own lists
-/// (screens-spec M-12: Rp -> M-10, M and V -> their detail screen). A list
-/// that has not loaded yet counts as reachable; the target handles its own
-/// states.
-String? notificationTarget(WidgetRef ref, AppUser user, String complaintId) {
-  switch (user.role) {
-    case UserRole.reporter:
-      final List<PublicComplaintView>? mine = ref
-          .read(myComplaintsProvider)
-          .value;
-      if (mine == null) return AppRoutes.complaint(complaintId);
-      return mine.any((c) => c.id == complaintId)
-          ? AppRoutes.complaint(complaintId)
-          : null;
-    case UserRole.maintenance:
-      final WorkQueue? queue = ref.read(workQueueProvider).value;
-      if (queue == null) return AppRoutes.workItem(complaintId);
-      final bool reachable = <PublicComplaintView>[
-        ...queue.toStart,
-        ...queue.inProgress,
-        ...queue.rework,
-      ].any((c) => c.id == complaintId);
-      return reachable ? AppRoutes.workItem(complaintId) : null;
-    case UserRole.verifier:
-      final List<PublicComplaintView>? waiting = ref
-          .read(verificationQueueProvider)
-          .value;
-      if (waiting == null) return AppRoutes.verifyItem(complaintId);
-      return waiting.any((c) => c.id == complaintId)
-          ? AppRoutes.verifyItem(complaintId)
-          : null;
-    case UserRole.admin:
-      // The admin console is on the web; mobile never holds an admin session.
-      return null;
-  }
-}
+/// The detail screen [role] opens for a notification about [complaintId]
+/// (screens-spec M-12: Rp -> M-10, M -> M-14, V -> M-17).
+String? notificationRoute(UserRole role, String complaintId) => switch (role) {
+  UserRole.reporter => AppRoutes.complaint(complaintId),
+  UserRole.maintenance => AppRoutes.workItem(complaintId),
+  UserRole.verifier => AppRoutes.verifyItem(complaintId),
+  // The admin console is on the web; mobile never holds an admin session.
+  UserRole.admin => null,
+};
 
 /// M-12 Notifications: the signed-in user's in-app feed, grouped Today /
 /// Earlier, newest first, unread ones marked. Tapping an item marks it read
@@ -86,6 +58,8 @@ class NotificationsScreen extends ConsumerWidget {
       notificationsProvider,
     );
     final int unread = ref.watch(unreadNotificationCountProvider);
+    // Watched only to keep it current: a tap checks it (see `_open`).
+    ref.watch(reachableComplaintIdsProvider);
 
     return Scaffold(
       appBar: AppTopBar.page(
@@ -179,7 +153,15 @@ class NotificationsScreen extends ConsumerWidget {
     final GoRouter router = GoRouter.of(context);
     await markNotificationRead(ref, n.id);
     if (user == null) return;
-    final String? target = notificationTarget(ref, user, n.complaintId);
+    // A list that has not loaded yet counts as reachable: the target screen
+    // handles its own states.
+    final Set<String>? reachable = ref
+        .read(reachableComplaintIdsProvider)
+        .value;
+    final String? target =
+        reachable != null && !reachable.contains(n.complaintId)
+        ? null
+        : notificationRoute(user.role, n.complaintId);
     if (target == null) {
       if (context.mounted) AppToast.show(context, 'No longer available');
       return;
