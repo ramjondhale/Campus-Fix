@@ -6,23 +6,27 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// **Privacy boundary** (data-model-spec section 3.5, privacy-spec section
 /// 5.1): raw `Complaint`s and reporter identity must never reach a widget. Only
-/// `lib/providers/` may touch the complaint repository and raw models; screens,
-/// the shell and the router consume `PublicComplaintView`s. The dashboard
-/// (A-02) and the list (A-03) are built from public views only, and until the
-/// A-04 detail (S5.4) exists NO file in the app may reference reporter or
-/// admin-view types at all.
+/// `lib/providers/` may touch the complaint repository and raw models for the
+/// public-view feeds; screens, the shell and the router consume
+/// `PublicComplaintView`s. The dashboard (A-02) and the list (A-03) are built
+/// from public views only.
 ///
-/// TODO(S5.4): the admin detail screen is the one place that builds an
-/// `AdminComplaintView` and renders the reporter-identity reveal panel. When it
-/// lands, extend [adminDetailDirs] / [adminIdentityPanel] below the way core's
-/// PR-T14 guard (`packages/campusfix_core/test/logic/privacy_test.dart`) does:
-/// `AdminComplaintView` / `toAdminView` / the raw complaint repository only
-/// under `lib/features/complaint_detail/`, and `ReporterIdentity` / `.reporter`
-/// only in `lib/features/complaint_detail/identity_panel.dart`. Keep the
-/// "nothing else" assertions and the allow-list exact (no stale entries).
+/// The one exception is the A-04 detail (S5.4), the single place that builds an
+/// `AdminComplaintView` and renders the reporter-identity reveal panel. The
+/// allow-list mirrors core's PR-T14 guard
+/// (`packages/campusfix_core/test/logic/privacy_test.dart`):
+///
+/// * `AdminComplaintView` / `toAdminView`, the raw complaint repository, the
+///   raw `Complaint` type and `actorId` / `assigneeId` appear only under
+///   [adminDetailDirs] (`lib/features/complaint_detail/`);
+/// * `ReporterIdentity` / `.reporter` appear only in [adminIdentityPanel]
+///   (`lib/features/complaint_detail/identity_panel.dart`).
+///
+/// Everything else stays fully forbidden, and the allow-list is **exact**:
+/// every allow-listed path must really be used (no stale entries).
 ///
 /// **Design system is law** (CLAUDE.md rule 1): no raw colours, ad-hoc text
-/// styles or hard-coded type metrics in app code.
+/// styles or hard-coded type metrics in app code, the detail screen included.
 void main() {
   final RegExp blockComment = RegExp(r'/\*[\s\S]*?\*/');
   final RegExp lineComment = RegExp(r'//[^\n]*');
@@ -42,9 +46,27 @@ void main() {
     'raw Complaint type': RegExp(r'<Complaint>|\bComplaint\('),
   };
 
-  // S5.4 fills these in (see the TODO above). Today nothing is allow-listed.
-  const Set<String> adminDetailDirs = <String>{};
-  const Set<String> adminIdentityPanel = <String>{};
+  // The A-04 allow-list (mirrors core's PR-T14): the detail directory may use
+  // the admin view, the raw complaint and the complaint repository; only the
+  // identity panel may touch the reporter.
+  const Set<String> adminDetailDirs = <String>{
+    'lib/features/complaint_detail/',
+  };
+  const Set<String> adminIdentityPanel = <String>{
+    'lib/features/complaint_detail/identity_panel.dart',
+  };
+
+  // The names only the identity panel may use; every other forbidden name is
+  // allowed anywhere under the detail directory.
+  const Set<String> identityNames = <String>{
+    'ReporterIdentity',
+    '.reporter access',
+  };
+
+  /// Whether the file at [path] may use [name] (a key of [forbidden]).
+  bool isAllowed(String path, String name) => identityNames.contains(name)
+      ? adminIdentityPanel.contains(path)
+      : adminDetailDirs.any(path.startsWith);
 
   List<File> dartFiles(Iterable<String> roots) => roots
       .map(Directory.new)
@@ -102,7 +124,52 @@ void main() {
     );
   });
 
-  test('screens, shell and router never see raw complaints or identity', () {
+  test('the allow-list exempts only the detail directory and the panel '
+      '(positive controls)', () {
+    const String panel = 'lib/features/complaint_detail/identity_panel.dart';
+    const String controller =
+        'lib/features/complaint_detail/complaint_detail_controller.dart';
+    // The detail directory may use the admin view, the repo and raw types ...
+    for (final String name in <String>[
+      'AdminComplaintView',
+      'toAdminView',
+      'actorId / assigneeId',
+      'ComplaintRepository',
+      'complaintRepositoryProvider',
+      'raw Complaint type',
+    ]) {
+      expect(isAllowed(controller, name), isTrue, reason: name);
+      expect(isAllowed(panel, name), isTrue, reason: name);
+      expect(
+        isAllowed('lib/features/dashboard/dashboard_screen.dart', name),
+        isFalse,
+        reason: name,
+      );
+      expect(isAllowed('lib/shell/admin_shell.dart', name), isFalse);
+      expect(isAllowed('lib/router/app_router.dart', name), isFalse);
+      expect(isAllowed('lib/features/complaints/x.dart', name), isFalse);
+    }
+    // ... but the reporter only in the identity panel itself.
+    for (final String name in identityNames) {
+      expect(isAllowed(panel, name), isTrue, reason: name);
+      expect(isAllowed(controller, name), isFalse, reason: name);
+      expect(
+        isAllowed('lib/features/complaint_detail/manage_dialogs.dart', name),
+        isFalse,
+        reason: name,
+      );
+      expect(isAllowed('lib/providers/complaints.dart', name), isFalse);
+      expect(isAllowed('lib/features/complaints/x.dart', name), isFalse);
+    }
+    // A look-alike directory is not the detail directory.
+    expect(
+      isAllowed('lib/features/complaint_detail_extra/x.dart', 'toAdminView'),
+      isFalse,
+    );
+  });
+
+  test('screens, shell and router never see raw complaints or identity '
+      '(outside the A-04 detail)', () {
     final List<File> files = uiFiles();
     expect(files, isNotEmpty);
 
@@ -110,7 +177,9 @@ void main() {
     for (final File file in files) {
       final String text = strip(file.readAsStringSync());
       forbidden.forEach((String name, RegExp pattern) {
-        if (pattern.hasMatch(text)) violations.add('${file.path}: $name');
+        if (pattern.hasMatch(text) && !isAllowed(file.path, name)) {
+          violations.add('${file.path}: $name');
+        }
       });
     }
     expect(violations, isEmpty, reason: violations.join('\n'));
@@ -159,11 +228,12 @@ void main() {
     );
   });
 
-  test('reporter and admin-view types appear nowhere in lib yet', () {
-    // Until S5.4 the allow-list is empty: no file may build an admin view or
-    // touch reporter identity (A-02 / A-03 are aggregates and public views).
+  test('reporter and admin-view types appear only in the A-04 detail '
+      'directory and its identity panel', () {
     final List<String> violations = <String>[];
-    final List<String> referencing = <String>[];
+    // Files that really use each family of types, for the exactness checks.
+    final Set<String> adminViewFiles = <String>{};
+    final Set<String> identityFiles = <String>{};
     for (final File file in dartFiles(<String>['lib'])) {
       final String text = strip(file.readAsStringSync());
       for (final String name in <String>[
@@ -173,29 +243,63 @@ void main() {
         '.reporter access',
       ]) {
         if (!forbidden[name]!.hasMatch(text)) continue;
-        referencing.add(file.path);
-        final bool allowed =
-            (name == 'ReporterIdentity' || name == '.reporter access')
-            ? adminIdentityPanel.contains(file.path)
-            : adminDetailDirs.any(file.path.startsWith);
-        if (!allowed) violations.add('${file.path}: $name');
+        (identityNames.contains(name) ? identityFiles : adminViewFiles).add(
+          file.path,
+        );
+        if (!isAllowed(file.path, name)) violations.add('${file.path}: $name');
       }
     }
     expect(violations, isEmpty, reason: violations.join('\n'));
+
     // The allow-list is exact: nothing is allowed that does not need it.
-    expect(referencing, isEmpty);
+    expect(
+      identityFiles,
+      adminIdentityPanel,
+      reason: 'the identity panel must be the one file that uses the reporter',
+    );
+    for (final String path in adminIdentityPanel) {
+      expect(File(path).existsSync(), isTrue, reason: path);
+      expect(
+        adminDetailDirs.any(path.startsWith),
+        isTrue,
+        reason: 'the identity panel lives in the detail directory',
+      );
+    }
+    for (final String dir in adminDetailDirs) {
+      expect(Directory(dir).existsSync(), isTrue, reason: dir);
+      expect(
+        adminViewFiles.any((String f) => f.startsWith(dir)),
+        isTrue,
+        reason:
+            'stale allow-list entry: nothing under $dir builds an admin view',
+      );
+    }
   });
 
-  test('only the providers library reads the complaint repository', () {
-    final List<String> offenders = <String>[
+  test('only the providers library and the A-04 detail read the complaint '
+      'repository', () {
+    final List<String> readers = <String>[
       for (final File file in dartFiles(<String>['lib']))
-        if (!file.path.startsWith('lib/providers/') &&
-            forbidden['complaintRepositoryProvider']!.hasMatch(
-              strip(file.readAsStringSync()),
-            ))
+        if (forbidden['complaintRepositoryProvider']!.hasMatch(
+          strip(file.readAsStringSync()),
+        ))
           file.path,
     ];
+    final List<String> offenders = <String>[
+      for (final String path in readers)
+        if (!path.startsWith('lib/providers/') &&
+            !adminDetailDirs.any(path.startsWith))
+          path,
+    ];
     expect(offenders, isEmpty, reason: offenders.join('\n'));
+    // The detail's exemption is real, not a stale entry.
+    for (final String dir in adminDetailDirs) {
+      expect(
+        readers.any((String f) => f.startsWith(dir)),
+        isTrue,
+        reason: 'nothing under $dir reads the complaint repository',
+      );
+    }
   });
 
   group('design system', () {
