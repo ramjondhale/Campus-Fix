@@ -1,2 +1,11 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+
+// Apple Silicon + Xcode 27 workaround: build the iOS simulator slice for arm64 only.
+// A universal (arm64 + x86_64) simulator build makes Flutter's thinFramework run
+// `lipo <framework> -verify_arch arm64 x86_64`, which Xcode 27's lipo rejects
+// ("-verify_arch requires exactly one input file"), so App.framework is never produced
+// (`flutter build ios --simulator` fails on App.framework: No such file). Excluding
+// x86_64 yields `-dIosArchs=arm64` → `lipo -verify_arch arm64` → build succeeds.
+// Note: arm64-only, so it won't run on an Intel Mac's simulator. See docs/BUILDING.md.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64

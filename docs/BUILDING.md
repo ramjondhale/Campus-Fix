@@ -23,19 +23,27 @@ cd apps/admin && flutter run -d chrome
 
 ## Mobile app
 
-### iOS simulator — KNOWN BUILD ISSUE (unresolved)
-With UTF-8 locale set, `pod install` succeeds and the deployment target is pinned to iOS 15.0
-(`ios/Podfile` `post_install` + `Runner.xcodeproj`). However `flutter build ios --simulator --debug`
-still fails with:
+### iOS simulator — WORKS (with an Apple-Silicon workaround)
+```bash
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8   # CocoaPods needs UTF-8
+flutter build ios --simulator --debug        # ✓ Built build/ios/iphonesimulator/Runner.app
+# or run it on a booted simulator:
+flutter run
 ```
-Error (Xcode): .../build/ios/Debug-iphonesimulator/App.framework: (l)stat: No such file or directory
-```
-Tried without success: `flutter clean` + fresh `pod install`, UTF-8 locale, deployment target 15.0,
-Podfile `post_install` override. The app's logic is fully covered by widget/unit tests; this is a
-build-pipeline issue (Flutter 3.41 `build ios --simulator` / Xcode), not an app bug. **To resolve:**
-try building/running `ios/Runner.xcworkspace` directly in Xcode (it often surfaces the real cause and
-regenerates `App.framework`), or `flutter run` from an interactive terminal. Tracked for the S6
-integration pass.
+**Root cause of the old `App.framework: No such file` failure (now fixed):** on Apple Silicon,
+`flutter build ios --simulator` builds a **universal** slice (`-dIosArchs=arm64 x86_64`). Flutter 3.41's
+`thinFramework` then runs `lipo <Flutter.framework/Flutter> -verify_arch arm64 x86_64`, which **Xcode 27's
+`lipo` rejects** with `-verify_arch requires exactly one input file`. So `debug_unpack_ios` fails,
+`App.framework` is never produced, and the embed step errors on the missing framework. (It is a
+Flutter-tool / Xcode-27 `lipo` incompatibility, not an app bug — the Dart compiled fine.)
+
+**Fix (in-repo):** build the simulator slice for **arm64 only** so the `lipo` call becomes
+`-verify_arch arm64` (one arch), which succeeds. This is set via
+`EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` in `ios/Flutter/Debug.xcconfig` and `Release.xcconfig`
+(Runner target) and in `ios/Podfile` `post_install` (pods). Deployment target stays pinned to iOS 15.0.
+**Caveat:** arm64-only simulator builds won't run on an **Intel** Mac's simulator; drop the
+`EXCLUDED_ARCHS` lines there (or upgrade to a Flutter version whose `thinFramework` handles Xcode 27's
+`lipo`). Verified: the app builds and launches on the iPhone 16 Pro simulator.
 
 ### Android
 Not yet verified in this environment.

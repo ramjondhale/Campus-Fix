@@ -43,6 +43,10 @@ post_install do |installer|
     # which is below the simulator's supported range and breaks App.framework).
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      # Apple Silicon + Xcode 27: build the simulator slice for arm64 only (match the
+      # Runner target in Flutter/*.xcconfig). A universal simulator build trips Flutter's
+      # thinFramework lipo check under Xcode 27 and App.framework is never produced.
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
     end
   end
 end

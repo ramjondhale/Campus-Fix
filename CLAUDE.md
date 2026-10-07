@@ -15,8 +15,8 @@ College-only complaint & maintenance app. **Flutter mobile + Flutter Web admin**
 - `apps/admin` — Flutter **Web** admin. **Feature-complete (S5.1–S5.4, 344 tests):** themed app, mock auth +
   A-01 login (A/V only; reporter/maintenance→E-403), go_router + role guard, responsive desktop-first shell
   (side-nav ≥1024 / icon-rail ≥600 / drawer <600), A-02 dashboard, A-03 list+filters, A-04 detail/manage
-  with the **admin-only identity reveal**. **`flutter build web` works** → the one visually verifiable app
-  (iOS is blocked). **Admin privacy allow-list lives in core's PR-T14 AND `apps/admin/test/architecture_guard_test.dart`**
+  with the **admin-only identity reveal**. **`flutter build web` works** (the mobile app also builds + runs
+  on the iOS simulator now — see known issues). **Admin privacy allow-list lives in core's PR-T14 AND `apps/admin/test/architecture_guard_test.dart`**
   (both scan `apps/admin/lib`): `AdminComplaintView`/`toAdminView`/raw-complaint/ids only under
   `features/complaint_detail/`; `ReporterIdentity`/`.reporter` only in
   `features/complaint_detail/identity_panel.dart`. Dashboard/list use `PublicComplaintView` only via
@@ -69,10 +69,12 @@ cd apps/admin && flutter run -d chrome
   Flows are correct + test-covered (work tests re-purpose seed complaints). Fix at S6 by changing
   `seed_data.dart` to give the demo electrician real open work, updating core seed-count tests + mobile
   `work_fixtures.dart` together — a mere demo-account swap breaks the electrician-pinned work tests.
-- **iOS simulator build blocked:** `flutter build ios --simulator` fails with `App.framework: No such
-  file` despite UTF-8 locale + iOS 15.0 deployment target + clean pods. Likely a Flutter 3.41/Xcode
-  pipeline quirk — try building `ios/Runner.xcworkspace` in Xcode directly. See
-  [docs/BUILDING.md](docs/BUILDING.md). App logic is fully test-covered regardless.
+- **iOS simulator build: FIXED** (was `App.framework: No such file`). Root cause: Xcode 27's `lipo`
+  rejects Flutter 3.41's two-arch `lipo -verify_arch arm64 x86_64` in `thinFramework`, so universal
+  simulator builds never produce `App.framework`. Fix: build arm64-only for the simulator via
+  `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` in `ios/Flutter/{Debug,Release}.xcconfig` + `ios/Podfile`
+  post_install. `flutter build ios --simulator` and `flutter run` work; the app launches on the iPhone 16
+  Pro sim. (arm64-only won't run on an Intel Mac's simulator — see [docs/BUILDING.md](docs/BUILDING.md).)
 
 ## Design system
 Published style guide: https://claude.ai/artifact/X521FrUxyrBpwzuus8xUyQ — token contract in
