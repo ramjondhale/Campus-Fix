@@ -41,3 +41,16 @@ Future<void> refreshNotifications(WidgetRef ref) async {
     // Shown by the screens as an error state with Retry.
   }
 }
+
+/// Marks one notification read (screens-spec M-12: tapping an item). The list
+/// updates through the repository's change stream.
+Future<void> markNotificationRead(WidgetRef ref, String id) async {
+  await ref.read(notificationServiceProvider).markRead(id);
+}
+
+/// Marks all of the signed-in user's notifications read ("Mark all as read").
+Future<void> markAllNotificationsRead(WidgetRef ref) async {
+  final user = ref.read(sessionProvider);
+  if (user == null) return;
+  await ref.read(notificationServiceProvider).markAllRead(user.id);
+}

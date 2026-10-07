@@ -76,6 +76,20 @@ final boardComplaintsProvider = Provider<AsyncValue<List<PublicComplaintView>>>(
   (ref) => ref.watch(_rawComplaintsProvider).whenData(toPublicViews),
 );
 
+/// One complaint by its ID, as a public view; `null` once loaded when no such
+/// complaint exists. Used by the Board Item Detail (screens-spec M-11b). The
+/// route carries only the ID (privacy LK-5), so this is the screen's whole
+/// lookup.
+final complaintViewProvider =
+    Provider.family<AsyncValue<PublicComplaintView?>, String>(
+      (ref, id) => ref.watch(boardComplaintsProvider).whenData((all) {
+        for (final c in all) {
+          if (c.id == id) return c;
+        }
+        return null;
+      }),
+    );
+
 /// The signed-in reporter's own complaints (`reporter.userId` equals the
 /// session user), `updatedAt` descending. Ownership is resolved on the raw
 /// complaint here and only the public projection is returned (screens-spec
