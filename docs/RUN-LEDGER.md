@@ -10,6 +10,11 @@ _Last updated: 2026-10-06 — by orchestrator._
 - **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report flow ✅; S4.3 next.
 - **Verify-gate reminder:** after merging any app chunk, re-run BOTH `apps/mobile` tests AND the
   `campusfix_core` suite (core's PR-T14 scans the mobile tree, so mobile changes can break core tests).
+- **⚠ iOS build blocker (see docs/BUILDING.md):** `flutter build ios --simulator` fails with
+  `App.framework: No such file`. Fixed along the way: CocoaPods needs `LANG=en_US.UTF-8`; deployment
+  target pinned to 15.0 (Podfile post_install + pbxproj). Remaining error is a Flutter/Xcode pipeline
+  quirk — resolve via Xcode-direct build at S6, or user's input. Visual QA on iOS deferred. Feature
+  work continues (logic is fully unit/widget-tested).
 - **⚠ Orchestration note:** background Sonnet agents are stalling on a stream watchdog (3 stalls). Running
   app agents in the **foreground** works reliably (S4.1 succeeded that way) but forces **serial** execution
   (no ≤4 parallel for now). Revert to parallel background when the stream recovers.
