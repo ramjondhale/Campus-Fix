@@ -12,15 +12,15 @@ College-only complaint & maintenance app. **Flutter mobile + Flutter Web admin**
   widgets + gallery. **Complete, 224 tests.** This is the **single source of UI truth**.
 - `apps/mobile` — Flutter app (reporter/maintenance/verifier). **Feature-complete** (all 3 role flows;
   199 tests). Verifier verifies (T5)/rejects (T7) only — **no close on mobile** (close is admin-only, web).
-- `apps/admin` — Flutter **Web** admin. **Foundation done (S5.1):** themed app, mock auth + A-01 login
-  (A/V only; reporter/maintenance→E-403), go_router + role guard, responsive desktop-first shell
-  (side-nav ≥1024 / icon-rail ≥600 / drawer <600), public-view boundary (`providers/complaints.dart`:
-  `allComplaintsProvider`, `complaintViewProvider`). Dashboard/list/detail are stubs (S5.2/S5.3/S5.4).
-  **`flutter build web` works** → the one visually verifiable app (iOS is blocked). **Admin privacy
-  allow-list lives in core's PR-T14** (scans `apps/admin/lib`): `AdminComplaintView` only under
-  `features/complaint_detail/`, `ReporterIdentity`/`.reporter` only in
-  `features/complaint_detail/identity_panel.dart` — so S5.4's admin-view controller + identity panel go
-  there, NOT in `providers/`.
+- `apps/admin` — Flutter **Web** admin. **Feature-complete (S5.1–S5.4, 344 tests):** themed app, mock auth +
+  A-01 login (A/V only; reporter/maintenance→E-403), go_router + role guard, responsive desktop-first shell
+  (side-nav ≥1024 / icon-rail ≥600 / drawer <600), A-02 dashboard, A-03 list+filters, A-04 detail/manage
+  with the **admin-only identity reveal**. **`flutter build web` works** → the one visually verifiable app
+  (iOS is blocked). **Admin privacy allow-list lives in core's PR-T14 AND `apps/admin/test/architecture_guard_test.dart`**
+  (both scan `apps/admin/lib`): `AdminComplaintView`/`toAdminView`/raw-complaint/ids only under
+  `features/complaint_detail/`; `ReporterIdentity`/`.reporter` only in
+  `features/complaint_detail/identity_panel.dart`. Dashboard/list use `PublicComplaintView` only via
+  `providers/complaints.dart`. Filter URL contract: `providers/complaint_query.dart`.
 - `docs/` — PLAN, RUN-LEDGER, ARCHITECTURE, ORCHESTRATION, BUILDING, specs/, design/.
 
 ## HARD RULES (do not violate)
@@ -58,6 +58,10 @@ cd apps/admin && flutter run -d chrome
 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.
 
 ## Known issues
+- **`AppSelect` broken on wide windows (S6 design fix):** `campusfix_design`'s `AppSelect` throws
+  "RenderShrinkWrappingViewport does not support returning intrinsic dimensions" on non-compact windows
+  (`ListView(shrinkWrap:true)` inside its `MenuAnchor`; only the compact bottom-sheet path is tested). Admin
+  S5.4 worked around it with `AppFilterChip` toggle chips. Fix the widget + add a wide-window test.
 - **Demo-data gap (S6, maintenance only):** the stock seed leaves the demo maintenance login (electrician
   `u-mnt-ele-01`) with an **empty queue**, so **M-13** shows empty states on a live run. (The demo verifier
   is fine — 4 `resolved` complaints exist and the queue isn't department-scoped, so **M-16 is populated**.)

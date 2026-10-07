@@ -7,11 +7,18 @@ _Last updated: 2026-10-07 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 6 (admin web). **Mobile app (all 3 roles) feature-complete** (Wave 5 done:
-  S4.1–S4.6). Admin web: **S5.1 foundation ✅, S5.2 dashboard ✅, S5.3 list+filters ✅**. Resume at the LAST
-  build chunk **S5.4 (detail/manage + identity reveal)** → then S6 (integration/walkthrough/cleanup).
-- **✅ Dashboard verified live** (orchestrator ran `flutter build web` + browser pane: login → dashboard
-  renders faithfully, numbers match aggregates, no drift).
+- **🎉 ALL BUILD CHUNKS DONE.** Wave 5 (mobile, S4.1–S4.6) ✅ + Wave 6 (admin web, S5.1–S5.4) ✅. The
+  prototype is feature-complete: mobile app (reporter/maintenance/verifier) + admin web console (login,
+  dashboard, list, detail/manage with admin-only identity reveal). Remaining = **S6** only
+  (integration ✓ all suites green, WALKTHROUGH.md, doc cleanup, Phase-2 Firebase plan). **Resume at S6.**
+- **✅ Verified:** core 651, mobile 199, admin 344 tests all green; analyze clean everywhere; admin
+  `flutter build web` ✓; dashboard verified live in the browser pane (faithful, no drift). iOS build still
+  blocked (S6/BUILDING.md); web is the visually-verifiable target.
+- **🐞 Design-system bug (S6 task):** `campusfix_design`'s `AppSelect` throws on non-compact windows
+  ("RenderShrinkWrappingViewport does not support returning intrinsic dimensions" — `ListView(shrinkWrap:
+  true)` inside its `MenuAnchor`; only the compact/bottom-sheet path is tested). S5.4 worked around it with
+  `AppFilterChip` toggle chips for department/staff pickers. **Fix `AppSelect` in the design package** (and
+  add a wide-window test) before anything else uses it on web.
 - **S5.4 inputs (the crux — admin identity reveal):** build under `apps/admin/lib/features/complaint_detail/`
   (core PR-T14 allow-lists ONLY this dir for `AdminComplaintView`, and ONLY
   `features/complaint_detail/identity_panel.dart` for `ReporterIdentity`/`.reporter`). The admin-view
@@ -91,7 +98,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | S5.1 Admin shell+auth+layout | ✅ | A | merged | 4a75ea1 | Admin web foundation: themed MaterialApp.router, mock auth+session, A-01 login (A/V demo accounts; reporter/maintenance→E-403, AC-45), go_router + role guard, responsive desktop-first shell (side-nav/rail/drawer @1024/600px), public-view data boundary (allComplaintsProvider), dashboard/list/detail stubs, E-403/E-404. 63 admin tests, analyze clean, flutter build web ✓. Detail stub placed at features/complaint_detail/ per core PR-T14. |
 | S5.2 Dashboard | ✅ | A | merged | 0a95a26 | A-02: 8 MetricCards (partition invariant 7+4+6+7+5=29 holds), 3 MetricBarRow breakdown charts (status/priority/category) + token-driven 14-day intake chart, 3 triage lists, AppSegmented date range (7/30/90/All), card/chart/row→A-03 presets (AC-47 exact: Critical/High→unresolved=1&priority=critical,high). Identity-free (public views+aggregates). 127 admin tests, core 651, analyze clean, web build ✓. Defines complaint_query.dart URL contract for S5.3. |
 | S5.3 Complaint list + filters | ✅ | A | merged | 364d6ff | A-03: design `ComplaintTable` (8 public cols, no reporter) + composed `FilterBar` (status/priority/category/department+Unassigned/building/created-range/unresolved+triage toggles/search/Reset) + sort (default: priority-weight desc then longest-waiting, AC-50) + pagination (25/50). Full URL round-trip (filter+sort+page+size); ~50 dashboard preset URLs match byte-for-byte; Critical/High→exactly 9 rows end-to-end (AC-47/49). Identity-free (AC-48). 243 admin tests, core 651, analyze clean, web build ✓. |
-| S5.4 Complaint management | ⬜ | A | | | assign/priority/status/photos. |
+| S5.4 Complaint management | ✅ | A | merged | 4eafee6 | A-04 detail/manage. A: AdminComplaintView + collapsed-by-default identity reveal (LK-8: explicit reveal, re-collapse on nav/sign-out, never in URL/title, no copy/export), priority/assignment/full-actor timeline panels, all 10 manage actions (review&route, assign, reassign, start/resolve on behalf, verify, close[A-only], reject, priority override, safety toggle) gated by nextStatuses+preconditions. V: public view only, no identity/assignee/priority-input/Close, public timeline. AC-51..55 covered. Admin guard extended (exact allow-list: complaint_detail/ + identity_panel.dart). 344 admin tests, core 651, analyze clean, web build ✓. Worked around AppSelect bug with toggle chips. |
 | S6.1 Integrate + build + smoke | ⬜ | O | | | merge all + screenshots. |
 | S6.2 Walkthrough + cleanup | ⬜ | O | | | WALKTHROUGH.md + tidy. |
 | S6.3 Phase-2 Firebase plan | ⬜ | O | | | backend build plan. |
@@ -143,6 +150,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | 18 | 2026-10-07 | 4a75ea1 | S5.1 admin web foundation merged (shell/auth/routing/responsive layout/public-view boundary + stubs); 63 admin tests, core 651 green, analyze clean, flutter build web ✓. First runnable-target app (web). |
 | 19 | 2026-10-07 | 0a95a26 | S5.2 admin dashboard merged (A-02 cards/charts/lists/date-range + A-03 query contract); 127 admin tests, core 651 green, analyze clean, web build ✓. |
 | 20 | 2026-10-07 | 364d6ff | S5.3 admin complaint list merged (A-03 table/filters/sort/pagination/URL-sync; dashboard presets round-trip); 243 admin tests, core 651 green, analyze clean, web build ✓. |
+| 21 | 2026-10-07 | 4eafee6 | S5.4 admin detail/manage + admin-only identity reveal merged (A-04; all manage actions; A/V split; guard extended). 344 admin tests, core 651 green, analyze clean, web build ✓. **ALL build chunks complete — only S6 remains.** |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
