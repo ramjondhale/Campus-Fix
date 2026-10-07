@@ -7,6 +7,7 @@
 library;
 
 export 'complaint_filter.dart';
+export 'complaint_list.dart';
 export 'complaint_query.dart';
 export 'complaints.dart';
 export 'dashboard.dart';
