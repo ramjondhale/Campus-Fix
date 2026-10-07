@@ -266,6 +266,11 @@ void main() {
       );
 
       await tester.tap(dialogButton('Verify'));
+      // Frame by frame: the page never flashes "not found" on its way out.
+      for (int i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(find.text("We couldn't find that complaint"), findsNothing);
+      }
       await tester.pumpAndSettle();
 
       final Complaint after = await stored(container, criticalElectrical);
