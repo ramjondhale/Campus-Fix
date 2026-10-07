@@ -1,3 +1,4 @@
+import 'package:campusfix_admin/features/complaints/complaint_list_screen.dart';
 import 'package:campusfix_admin/providers/providers.dart';
 import 'package:campusfix_admin/router/app_router.dart';
 import 'package:campusfix_admin/router/routes.dart';
@@ -80,10 +81,7 @@ void main() {
       await tester.tap(inNav('Complaints'));
       await tester.pumpAndSettle();
       expect(router.state.uri.path, AppRoutes.complaints);
-      expect(
-        find.text('The complaint list arrives in a later release.'),
-        findsOneWidget,
-      );
+      expect(find.byType(ComplaintListScreen), findsOneWidget);
       expect(find.text('Status breakdown'), findsNothing);
       expect(sideNav(tester).selectedIndex, 1);
       expect(inTopBar('Complaints'), findsOneWidget);
@@ -228,10 +226,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(router.state.uri.path, AppRoutes.complaints);
       expect(find.byType(AdminSideNav), findsNothing, reason: 'drawer closed');
-      expect(
-        find.text('The complaint list arrives in a later release.'),
-        findsOneWidget,
-      );
+      expect(find.byType(ComplaintListScreen), findsOneWidget);
       expect(find.byType(Drawer), findsNothing);
     });
 
@@ -262,7 +257,7 @@ void main() {
         await resizeTo(tester, size);
         expect(router.state.uri.path, AppRoutes.complaints, reason: '$size');
         expect(
-          find.text('The complaint list arrives in a later release.'),
+          find.byType(ComplaintListScreen),
           findsOneWidget,
           reason: '$size',
         );

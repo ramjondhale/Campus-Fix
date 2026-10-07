@@ -26,6 +26,15 @@ const int kIntakeDays = 14;
 bool isUnresolvedStatus(ComplaintStatus status) =>
     status.order < ComplaintStatus.resolved.order;
 
+/// Whether [complaint] awaits manual triage: reviewed, with no department
+/// assigned (Safety and Other have no default routing). The dashboard's
+/// "Awaiting manual triage" list and the complaint list's "Needs manual
+/// triage" toggle both use this one definition, so the preset lands on the
+/// counted set.
+bool needsManualTriage(PublicComplaintView complaint) =>
+    complaint.status == ComplaintStatus.reviewed &&
+    complaint.assignedDepartment == null;
+
 /// Whether [priority] is one of the two the dashboard flags (Critical / High).
 bool isCriticalOrHigh(Priority priority) =>
     priority == Priority.critical || priority == Priority.high;
@@ -282,14 +291,7 @@ DashboardList oldestUnresolvedOf(
 DashboardList awaitingTriageOf(
   Iterable<PublicComplaintView> complaints, {
   int limit = kDashboardListSize,
-}) => _topOf(
-  complaints.where(
-    (PublicComplaintView c) =>
-        c.status == ComplaintStatus.reviewed && c.assignedDepartment == null,
-  ),
-  _byWeightThenAge,
-  limit,
-);
+}) => _topOf(complaints.where(needsManualTriage), _byWeightThenAge, limit);
 
 /// The "created within" range the whole dashboard is computed for (default
 /// All). Kept in a provider so every card, chart and list recomputes when it
