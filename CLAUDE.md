@@ -12,7 +12,15 @@ College-only complaint & maintenance app. **Flutter mobile + Flutter Web admin**
   widgets + gallery. **Complete, 224 tests.** This is the **single source of UI truth**.
 - `apps/mobile` — Flutter app (reporter/maintenance/verifier). **Feature-complete** (all 3 role flows;
   199 tests). Verifier verifies (T5)/rejects (T7) only — **no close on mobile** (close is admin-only, web).
-- `apps/admin` — Flutter Web admin. Not started.
+- `apps/admin` — Flutter **Web** admin. **Foundation done (S5.1):** themed app, mock auth + A-01 login
+  (A/V only; reporter/maintenance→E-403), go_router + role guard, responsive desktop-first shell
+  (side-nav ≥1024 / icon-rail ≥600 / drawer <600), public-view boundary (`providers/complaints.dart`:
+  `allComplaintsProvider`, `complaintViewProvider`). Dashboard/list/detail are stubs (S5.2/S5.3/S5.4).
+  **`flutter build web` works** → the one visually verifiable app (iOS is blocked). **Admin privacy
+  allow-list lives in core's PR-T14** (scans `apps/admin/lib`): `AdminComplaintView` only under
+  `features/complaint_detail/`, `ReporterIdentity`/`.reporter` only in
+  `features/complaint_detail/identity_panel.dart` — so S5.4's admin-view controller + identity panel go
+  there, NOT in `providers/`.
 - `docs/` — PLAN, RUN-LEDGER, ARCHITECTURE, ORCHESTRATION, BUILDING, specs/, design/.
 
 ## HARD RULES (do not violate)

@@ -7,9 +7,17 @@ _Last updated: 2026-10-07 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report ✅, S4.3+S4.4 reader screens ✅,
-  **S4.5 maintenance flow ✅**, **S4.6 verifier flow ✅**. **The whole mobile app (all 3 roles) is now
-  feature-complete** (reporter, maintenance, verifier). Resume at **S5 (admin web)** → S6 (integration).
+- **Active wave:** Wave 6 (admin web). **Mobile app (all 3 roles) feature-complete** (Wave 5 done:
+  S4.1–S4.6). Admin web: **S5.1 foundation ✅**. Resume at **S5.2 (dashboard)** → S5.3 (list) → S5.4
+  (detail/manage + identity reveal) → S6 (integration).
+- **✅ Admin web BUILDS:** `cd apps/admin && flutter build web` succeeds (unlike the blocked iOS target),
+  so the admin console is the one **visually verifiable** app — do a live preview / screenshots at S5.2+.
+- **🔑 Admin privacy is pre-wired in core's PR-T14 guard** (it scans `apps/admin/lib`): `AdminComplaintView`
+  is allowed ONLY under `apps/admin/lib/features/complaint_detail/`, and `ReporterIdentity`/`.reporter` ONLY
+  in `apps/admin/lib/features/complaint_detail/identity_panel.dart`; `AdminComplaintView` is forbidden in
+  `providers/`. So **S5.4's admin-view controller + identity panel must live under `features/complaint_detail/`**
+  (the S5.1 stub is already placed there). Dashboard (S5.2) + list (S5.3) use `PublicComplaintView` only via
+  `apps/admin/lib/providers/complaints.dart` (`allComplaintsProvider`, `complaintViewProvider(id)`).
 - **Minor cleanup (S6):** M-17 imports `WorkActionBar` + `kNoteVisibilityHelper` from
   `features/work/work_widgets.dart` (cross-feature). Consider hoisting shared action-bar/note widgets to
   `features/shared`. Some test finders (`button`/`dialogButton`/`tapButton`) are duplicated across
@@ -66,7 +74,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | S4.4 Board + Notifications | ✅ | A | merged | (merge) | anon board (filters/search) + notifications (read state); 106 mobile tests; core guard green. |
 | S4.5 Maintenance flow | ✅ | A | merged | 678c89a | M-13 Assigned Work (To start/In progress/Rework) + M-14 Work Detail (start/claim T3) + M-15 After-Repair resolve (T4); PII-free write controller in providers/work_actions.dart; 157 mobile tests (106+51), core 651 green, no raw colors. |
 | S4.6 Verifier flow | ✅ | A | merged | 53305c2 | M-16 Verification Queue + M-17 Verify/Reject (verify T5 / reject T7 — **no close on mobile**, close is admin-only T6/web); PII-free verify_actions controller; 199 mobile tests (157+42), core 651 green, no raw colors. Reconciled stale "Verify & Close" spec text (M-17/AC-42/A-04). |
-| S5.1 Admin shell+auth+layout | ⬜ | A | | | responsive web shell. |
+| S5.1 Admin shell+auth+layout | ✅ | A | merged | 4a75ea1 | Admin web foundation: themed MaterialApp.router, mock auth+session, A-01 login (A/V demo accounts; reporter/maintenance→E-403, AC-45), go_router + role guard, responsive desktop-first shell (side-nav/rail/drawer @1024/600px), public-view data boundary (allComplaintsProvider), dashboard/list/detail stubs, E-403/E-404. 63 admin tests, analyze clean, flutter build web ✓. Detail stub placed at features/complaint_detail/ per core PR-T14. |
 | S5.2 Dashboard | ⬜ | A | | | metric cards + charts. |
 | S5.3 Complaint list + filters | ⬜ | A | | | table + filters. |
 | S5.4 Complaint management | ⬜ | A | | | assign/priority/status/photos. |
@@ -118,6 +126,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | 15 | 2026-10-07 | 2798206 | S4.3+S4.4 reader screens merged (106 mobile tests); CLAUDE.md + hard design-system/foreground rules added. Phase paused for compaction. |
 | 16 | 2026-10-07 | 678c89a | S4.5 maintenance flow merged (M-13/M-14/M-15 + work write controller); 157 mobile tests, core 651 green, analyze clean, no design drift. Demo-data gap logged as S6 task. |
 | 17 | 2026-10-07 | 53305c2 | S4.6 verifier flow merged (M-16/M-17 verify+reject, no mobile close); 199 mobile tests, core 651 green, analyze clean. Mobile app feature-complete. Stale "Verify & Close" spec reconciled; demo-data gap corrected (verifier queue is fine). |
+| 18 | 2026-10-07 | 4a75ea1 | S5.1 admin web foundation merged (shell/auth/routing/responsive layout/public-view boundary + stubs); 63 admin tests, core 651 green, analyze clean, flutter build web ✓. First runnable-target app (web). |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
