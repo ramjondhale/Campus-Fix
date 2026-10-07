@@ -23,6 +23,13 @@ class AppSelectOption<T> {
   final String label;
 }
 
+/// Maximum height of the anchored menu on wide windows, including its padding.
+/// The mobile sheet is capped separately by [AppBottomSheet].
+const double _menuMaxHeight = 360;
+
+/// Vertical padding between the anchored menu's edge and its content.
+const double _menuPadding = AppSpace.s2;
+
 /// The CampusFix select (contract 8.3): the text-field shell with a trailing
 /// `expand_more`.
 ///
@@ -195,21 +202,36 @@ class _AppSelectState<T> extends State<AppSelect<T>> {
         final Widget anchored = MenuAnchor(
           controller: _menu,
           style: MenuStyle(
+            padding: const WidgetStatePropertyAll<EdgeInsetsGeometry>(
+              EdgeInsets.symmetric(vertical: _menuPadding),
+            ),
             minimumSize: WidgetStatePropertyAll<Size>(Size(_width, 0)),
-            maximumSize: WidgetStatePropertyAll<Size>(Size(_width, 360)),
+            maximumSize: WidgetStatePropertyAll<Size>(
+              Size(_width, _menuMaxHeight),
+            ),
           ),
           menuChildren: <Widget>[
+            // The menu panel sizes itself with intrinsic dimensions inside an
+            // unbounded scroll view. The width is fixed and the height capped
+            // here, so the list scrolls inside the panel rather than the
+            // panel scrolling it (the search field stays pinned).
             SizedBox(
               width: _width - 8,
-              child: _OptionList<T>(
-                options: widget.options,
-                selected: widget.value,
-                dense: widget.dense,
-                searchable: widget.options.length > widget.searchThreshold,
-                onPick: (AppSelectOption<T> o) {
-                  _menu.close();
-                  _choose(o.value);
-                },
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: _menuMaxHeight - 2 * _menuPadding,
+                ),
+                child: _OptionList<T>(
+                  options: widget.options,
+                  selected: widget.value,
+                  dense: widget.dense,
+                  searchable: widget.options.length > widget.searchThreshold,
+                  inMenu: true,
+                  onPick: (AppSelectOption<T> o) {
+                    _menu.close();
+                    _choose(o.value);
+                  },
+                ),
               ),
             ),
           ],
@@ -247,6 +269,7 @@ class _OptionList<T> extends StatefulWidget {
     required this.dense,
     required this.searchable,
     required this.onPick,
+    this.inMenu = false,
   });
 
   final List<AppSelectOption<T>> options;
@@ -254,6 +277,9 @@ class _OptionList<T> extends StatefulWidget {
   final bool dense;
   final bool searchable;
   final ValueChanged<AppSelectOption<T>> onPick;
+
+  /// True inside the anchored menu (wide windows), false in the mobile sheet.
+  final bool inMenu;
 
   @override
   State<_OptionList<T>> createState() => _OptionListState<T>();
@@ -270,6 +296,15 @@ class _OptionListState<T> extends State<_OptionList<T>> {
         if (q.isEmpty || o.label.toLowerCase().contains(q)) o,
     ];
     final ColorScheme scheme = context.colorScheme;
+    final List<Widget> rows = <Widget>[
+      for (final AppSelectOption<T> o in shown)
+        _OptionRow<T>(
+          option: o,
+          selected: o.value == widget.selected,
+          dense: widget.dense,
+          onTap: () => widget.onPick(o),
+        ),
+    ];
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -293,21 +328,56 @@ class _OptionListState<T> extends State<_OptionList<T>> {
                     ),
                   ),
                 )
+              : widget.inMenu
+              ? _MenuRows(children: rows)
               : ListView(
                   shrinkWrap: true,
                   padding: EdgeInsets.zero,
-                  children: <Widget>[
-                    for (final AppSelectOption<T> o in shown)
-                      _OptionRow<T>(
-                        option: o,
-                        selected: o.value == widget.selected,
-                        dense: widget.dense,
-                        onTap: () => widget.onPick(o),
-                      ),
-                  ],
+                  children: rows,
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// The scrolling rows of the anchored menu.
+///
+/// The `MenuAnchor` panel measures its content with intrinsic dimensions,
+/// which no `ListView` (a viewport) can report, shrink-wrapped or not. A
+/// `SingleChildScrollView` can. It owns its controller so it does not attach
+/// to the `PrimaryScrollController` the panel already scrolls with, and draws
+/// the scrollbar the panel's own scroll configuration switches off.
+class _MenuRows extends StatefulWidget {
+  const _MenuRows({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  State<_MenuRows> createState() => _MenuRowsState();
+}
+
+class _MenuRowsState extends State<_MenuRows> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      controller: _scroll,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        controller: _scroll,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: widget.children,
+        ),
+      ),
     );
   }
 }
