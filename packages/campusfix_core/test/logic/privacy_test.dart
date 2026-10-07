@@ -934,8 +934,10 @@ void main() {
     // Explicit allow-list entries (repo-relative, forward slashes). The ONLY
     // permitted reference to the reporter in apps/mobile is the report-submit
     // controller that builds the draft Complaint from the signed-in user.
-    // S4 adds its path here (and only here) when that file exists.
-    const mobileReporterAllowList = <String>{};
+    // S4.2 added its path here (and only here).
+    const mobileReporterAllowList = <String>{
+      'apps/mobile/lib/providers/report_submit.dart',
+    };
     const adminIdentityPanel =
         'apps/admin/lib/features/complaint_detail/identity_panel.dart';
     const adminDetailDir = 'apps/admin/lib/features/complaint_detail/';

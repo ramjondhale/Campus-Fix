@@ -89,4 +89,41 @@ void main() {
       expect(m.group(2), isNot(matches(RegExp(r'\bComplaint\b'))));
     }
   });
+
+  // The ONE file that may build a `ReporterIdentity` (privacy-spec section 5.1):
+  // the report-submit controller that turns the signed-in user into the
+  // reporter of the new complaint. Core's PR-T14 guard allow-lists the same
+  // path (as `apps/mobile/lib/providers/report_submit.dart`).
+  const Set<String> reporterAllowList = <String>{
+    'lib/providers/report_submit.dart',
+  };
+
+  List<File> allLibFiles() => Directory('lib')
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.dart'))
+      .toList();
+
+  test('ReporterIdentity appears only in the allow-listed submit file', () {
+    final List<String> violations = <String>[];
+    final List<String> referencing = <String>[];
+    for (final File file in allLibFiles()) {
+      final String text = strip(file.readAsStringSync());
+      if (forbidden['ReporterIdentity']!.hasMatch(text)) {
+        referencing.add(file.path);
+        if (!reporterAllowList.contains(file.path)) violations.add(file.path);
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+    // The allow-list is exact: no stale entries, nothing else on it.
+    expect(referencing, unorderedEquals(reporterAllowList));
+  });
+
+  test('the submit controller never touches admin identity views', () {
+    for (final String path in reporterAllowList) {
+      final String text = strip(File(path).readAsStringSync());
+      expect(forbidden['AdminComplaintView']!.hasMatch(text), isFalse);
+      expect(forbidden['toAdminView']!.hasMatch(text), isFalse);
+    }
+  });
 }
