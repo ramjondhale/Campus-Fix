@@ -2,20 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../shared/coming_soon_screen.dart';
 
-/// Stub for M-16 Verification Queue (verifier; built in S4.6). Reached from
-/// Home "Open verification queue"; the bottom-nav "Verify" tab keeps its
-/// selection here.
-class VerificationQueueScreen extends StatelessWidget {
-  const VerificationQueueScreen({super.key});
+export 'verification_queue_screen.dart' show VerificationQueueScreen;
 
-  @override
-  Widget build(BuildContext context) => const ComingSoonScreen(
-    title: 'Verification queue',
-    icon: Icons.fact_check_outlined,
-  );
-}
-
-/// Stub for M-17 Verify & Close (`/verify/:id`, S4.6).
+/// Stub for M-17 Verify & Close (`/verify/:id`, built in the next commit).
 class VerifyCloseScreen extends StatelessWidget {
   const VerifyCloseScreen({super.key, required this.complaintId});
 
@@ -23,7 +12,7 @@ class VerifyCloseScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const ComingSoonScreen(
-    title: 'Verify & close',
+    title: 'Verify repair',
     icon: Icons.fact_check_outlined,
   );
 }
