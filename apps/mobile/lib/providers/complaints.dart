@@ -22,6 +22,18 @@ final _rawComplaintsProvider = StreamProvider<List<Complaint>>((ref) async* {
   yield* repo.watchAll();
 });
 
+/// Re-reads the complaints (pull-to-refresh / Retry) and completes when the
+/// new value, or an error, has arrived. Errors surface through the providers'
+/// `AsyncValue`s, not through this future.
+Future<void> refreshComplaints(WidgetRef ref) async {
+  ref.invalidate(_rawComplaintsProvider);
+  try {
+    await ref.read(_rawComplaintsProvider.future);
+  } catch (_) {
+    // Shown by the screens as an error state with Retry.
+  }
+}
+
 /// Most urgent first, then newest (`createdAt`) first.
 int _byPriorityThenNewest(PublicComplaintView a, PublicComplaintView b) {
   final byWeight = b.effectivePriority.weight.compareTo(

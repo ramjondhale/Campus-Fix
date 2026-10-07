@@ -30,3 +30,14 @@ final unreadNotificationCountProvider = Provider<int>(
         orElse: () => 0,
       ),
 );
+
+/// Re-reads the notifications (pull-to-refresh / Retry); see
+/// `refreshComplaints`.
+Future<void> refreshNotifications(WidgetRef ref) async {
+  ref.invalidate(notificationsProvider);
+  try {
+    await ref.read(notificationsProvider.future);
+  } catch (_) {
+    // Shown by the screens as an error state with Retry.
+  }
+}
