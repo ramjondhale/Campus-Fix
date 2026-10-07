@@ -13,8 +13,15 @@ _Last updated: 2026-10-07 — by orchestrator._
   with admin-only identity reveal). **1,418 tests green** (core 651, design 224, mobile 199, admin 344);
   analyze clean; admin `flutter build web` ✓. Phase 2 (Firebase) is planned in
   [../phase-2-firebase-plan.md](../phase-2-firebase-plan.md), not built.
-- **Open follow-ups (not blockers):** iOS simulator build (App.framework — [../BUILDING.md](../BUILDING.md));
-  `AppSelect` wide-window bug in the design package; maintenance demo-seed queue is empty (demo polish).
+- **Follow-ups (all ✅ 2026-10-07):**
+  1. **iOS simulator build FIXED** — Xcode 27 `lipo` rejects Flutter 3.41's two-arch `-verify_arch`; build
+     arm64-only for the simulator (`EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64` in `ios/Flutter/*.xcconfig`
+     + Podfile). App builds + launches on iPhone 16 Pro sim (verified live). [../BUILDING.md](../BUILDING.md).
+  2. **`AppSelect` wide-window crash FIXED** — `IntrinsicWidth` querying a viewport; replaced with a bounded
+     `SingleChildScrollView` + own controller. Design suite 224→232.
+  3. **Maintenance demo queue FIXED** — demo maintenance login → `u-mnt-it-01` (populated: To-start 1 +
+     Rework 1); seed complaints unchanged; mobile work tests derive the department dynamically.
+  All suites green after each: core 651, design 232, mobile 199, admin 344.
 - **✅ Verified:** core 651, mobile 199, admin 344 tests all green; analyze clean everywhere; admin
   `flutter build web` ✓; dashboard verified live in the browser pane (faithful, no drift). iOS build still
   blocked (S6/BUILDING.md); web is the visually-verifiable target.
@@ -156,7 +163,10 @@ _Last updated: 2026-10-07 — by orchestrator._
 | 20 | 2026-10-07 | 364d6ff | S5.3 admin complaint list merged (A-03 table/filters/sort/pagination/URL-sync; dashboard presets round-trip); 243 admin tests, core 651 green, analyze clean, web build ✓. |
 | 21 | 2026-10-07 | 4eafee6 | S5.4 admin detail/manage + admin-only identity reveal merged (A-04; all manage actions; A/V split; guard extended). 344 admin tests, core 651 green, analyze clean, web build ✓. **ALL build chunks complete — only S6 remains.** |
 | 22 | 2026-10-07 | 60e9f0c | S6 docs merged (WALKTHROUGH.md + phase-2-firebase-plan.md). Final integration gate green: core 651 / design 224 / mobile 199 / admin 344 = 1418 tests. Enum-count docs corrected (11). S6.1/S6.3 ✅; S6.2 cleanup pending user decision. |
-| 23 | 2026-10-07 | (final) | S6.2 doc cleanup: archived PLAN/RUN-LEDGER/ORCHESTRATION to docs/process/ (user chose archive-not-delete; CLAUDE.md kept); rewrote README + fixed all cross-links. **PROJECT COMPLETE — Phase 1 done. All waves ✅.** |
+| 23 | 2026-10-07 | 11cf779 | S6.2 doc cleanup: archived PLAN/RUN-LEDGER/ORCHESTRATION to docs/process/ (user chose archive-not-delete; CLAUDE.md kept); rewrote README + fixed all cross-links. **PROJECT COMPLETE — Phase 1 done. All waves ✅.** |
+| 24 | 2026-10-07 | 9411207 | Follow-up 1: iOS simulator build fixed (Xcode 27 lipo / arm64-only sim). App launches on iPhone 16 Pro. |
+| 25 | 2026-10-07 | 00aa8c2 | Follow-up 2: AppSelect wide-window crash fixed (design 232 tests). |
+| 26 | 2026-10-07 | (this) | Follow-up 3: maintenance demo login → u-mnt-it-01 (populated queue); seed complaints unchanged; core 651 / mobile 199 / admin 344 green. **All three follow-ups done.** |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

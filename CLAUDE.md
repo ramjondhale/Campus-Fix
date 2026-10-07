@@ -59,12 +59,10 @@ cd apps/admin && flutter run -d chrome
 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.
 
 ## Known issues
-- **Demo-data gap (S6, maintenance only):** the stock seed leaves the demo maintenance login (electrician
-  `u-mnt-ele-01`) with an **empty queue**, so **M-13** shows empty states on a live run. (The demo verifier
-  is fine — 4 `resolved` complaints exist and the queue isn't department-scoped, so **M-16 is populated**.)
-  Flows are correct + test-covered (work tests re-purpose seed complaints). Fix at S6 by changing
-  `seed_data.dart` to give the demo electrician real open work, updating core seed-count tests + mobile
-  `work_fixtures.dart` together — a mere demo-account swap breaks the electrician-pinned work tests.
+- _(resolved)_ **Demo maintenance queue** — the demo maintenance login now points at `u-mnt-it-01`
+  (IT Team), who has a populated stock-seed queue (To-start 1 + Rework 1), so M-13 is demoable. Mobile work
+  tests derive the department from `demoAccount(UserRole.maintenance)` (not hardcoded). Seed complaints
+  unchanged. No open known issues remain.
 - **iOS simulator build: FIXED** (was `App.framework: No such file`). Root cause: Xcode 27's `lipo`
   rejects Flutter 3.41's two-arch `lipo -verify_arch arm64 x86_64` in `thinFramework`, so universal
   simulator builds never produce `App.framework`. Fix: build arm64-only for the simulator via
