@@ -1,12 +1,12 @@
 {
-    "name": "campusfix_admin",
-    "short_name": "campusfix_admin",
+    "name": "CampusFix Admin",
+    "short_name": "CampusFix Admin",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "description": "CampusFix AI admin console.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
