@@ -10,6 +10,7 @@ import 'package:campusfix_core/campusfix_core.dart';
 import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'complaints.dart';
 import 'report_draft.dart';
 import 'services.dart';
 import 'session.dart';
@@ -108,6 +109,11 @@ class ReportSubmitNotifier extends Notifier<ReportSubmitState> {
       );
       state = ReportSubmitState(last: report);
       ref.read(reportDraftProvider.notifier).reset();
+      // Let the complaint lists catch up with the new complaint now, outside a
+      // widget build, so the confirmation screen does not trigger that
+      // refresh while it is being built.
+      await Future<void>.delayed(Duration.zero);
+      ref.read(myComplaintsProvider);
       return report;
     } catch (_) {
       state = ReportSubmitState(
