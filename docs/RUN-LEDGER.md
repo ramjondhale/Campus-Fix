@@ -7,7 +7,9 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report flow ✅; S4.3 next.
+- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report ✅, S4.3+S4.4 reader screens ✅.
+  **⏸ PAUSED for context compaction (user request).** Resume at **S4.5 (maintenance flow)** → S4.6
+  (verifier) → S5 (admin web) → S6 (integration). Reporter-facing mobile app is now feature-complete.
 - **Verify-gate reminder:** after merging any app chunk, re-run BOTH `apps/mobile` tests AND the
   `campusfix_core` suite (core's PR-T14 scans the mobile tree, so mobile changes can break core tests).
 - **⚠ iOS build blocker (see docs/BUILDING.md):** `flutter build ios --simulator` fails with
@@ -48,8 +50,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S3.2 Reusable widgets | ✅ | A | merged | dd01ef4 | 29 PII-free widgets + gallery + example app + architecture guard; 224 tests, analyze clean. Agent stalled pre-commit; orchestrator verified+committed+merged. |
 | S4.1 Mobile shell + auth | ✅ | A | merged | 79f744d | go_router + providers (privacy boundary) + mock login + role-aware shell/home + 7 feature stubs; 33 tests, analyze clean. (foreground agent; 2 prior bg stalls.) Reporter nav = Home/My Complaints/Board/Alerts per spec; Report is a Home CTA. |
 | S4.2 Report-a-Problem flow | ✅ | A | merged | (ff) | Category→Location→Photos→Details→Review→Submit→Confirmation(ID+priority); draft state + privacy-safe submit controller; 59 mobile tests. Fixed pre-existing core PR-T14 regex (UserRole.reporter false-positive) + allow-listed boundary provider. |
-| S4.3 My Complaints + Details | ⬜ | A | | | list + timeline + before/after. |
-| S4.4 Board + Notifications | ⬜ | A | | | anon board + notifications. |
+| S4.3 My Complaints + Details | ✅ | A | merged | (merge) | list (own complaints) + details (timeline/before-after/privacy-safe); design-system-clean. |
+| S4.4 Board + Notifications | ✅ | A | merged | (merge) | anon board (filters/search) + notifications (read state); 106 mobile tests; core guard green. |
 | S4.5 Maintenance flow | ⬜ | A | | | assigned→progress→after-repair. |
 | S4.6 Verifier flow | ⬜ | A | | | verify→close. |
 | S5.1 Admin shell+auth+layout | ⬜ | A | | | responsive web shell. |
@@ -99,7 +101,9 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 10 | 2026-10-06 | 1d2fc99 | S3.1 merged: Flutter theme (tokens, typography, ThemeExtensions, AppTheme light/dark); 66 tests. |
 | 11 | 2026-10-07 | c5aad09 | S3.2 merged: 29-widget library + gallery + example; 224 tests. Design package complete. |
 | 12 | 2026-10-07 | d0f0e7f | S4.1 merged: mobile app shell (router/providers/login/nav + stubs); 33 tests. First runnable app. |
-| 13 | 2026-10-07 | _this commit_ | S4.2 merged: Report-a-Problem flow (59 mobile tests) + fixed core PR-T14 guard regression; core 651 green. |
+| 13 | 2026-10-07 | de60521 | S4.2 merged: Report-a-Problem flow (59 mobile tests) + fixed core PR-T14 guard regression; core 651 green. |
+| 14 | 2026-10-07 | f8eaa1a | iOS config fixes (UTF-8 locale, deploy target 15.0) + BUILDING.md (App.framework blocker). |
+| 15 | 2026-10-07 | _this commit_ | S4.3+S4.4 reader screens merged (106 mobile tests); CLAUDE.md + hard design-system/foreground rules added. Phase paused for compaction. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

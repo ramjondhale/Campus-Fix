@@ -23,6 +23,17 @@ implementation, exploration, and analysis onto cheaper Sonnet agents.
    head or an un-committed tree.
 5. **Clean up after merge.** Once an agent's branch is merged and verified, delete the branch and
    remove its worktree.
+6. **Design system is law — no UI drift.** Every UI agent MUST style exclusively through the design
+   system: `campusfix_design` theme tokens, `ThemeExtension`s (`CampusColors`, category/priority/status
+   palettes), the `BuildContext` helpers, and the shared widgets. **No raw `Colors.*`, `Color(0x…)`,
+   literal hex, ad-hoc `TextStyle`, or hardcoded sizes/radii in app code** (`Colors.transparent` is the
+   only allowed literal). Need a color/role that doesn't exist? Add it to the design system (and
+   `design-system.md`), don't inline it. The orchestrator greps every merged UI chunk for raw colors
+   and rejects drift. This keeps the final UI faithful to `docs/design/design-system.md` and the
+   published style guide.
+7. **Prefer FOREGROUND agents for Flutter app chunks.** Background agents have been killed by a stream
+   watchdog; foreground dispatch (`run_in_background: false`) is reliable. Agents must **commit code in
+   stages** before running slow `flutter` commands, so any interruption is salvageable.
 
 ## Branch & worktree model
 - Trunk (the orchestrator's integration branch): **`main`**. All verified work lands here; every
