@@ -126,7 +126,7 @@ void main() {
     expect(find.text('Page not found'), findsOneWidget);
   });
 
-  testWidgets('every stubbed route renders its Coming soon screen', (
+  testWidgets('every still-stubbed route renders its Coming soon screen', (
     tester,
   ) async {
     final container = await pumpCampusFix(tester);
@@ -134,12 +134,6 @@ void main() {
 
     await signInAs(tester, UserRole.reporter);
     for (final path in <String>[
-      AppRoutes.reportCategory,
-      AppRoutes.reportLocation,
-      AppRoutes.reportPhotos,
-      AppRoutes.reportDetails,
-      AppRoutes.reportReview,
-      AppRoutes.reportDone('CF-2026-00001'),
       AppRoutes.complaints,
       AppRoutes.complaint('CF-2026-00001'),
       AppRoutes.board,
