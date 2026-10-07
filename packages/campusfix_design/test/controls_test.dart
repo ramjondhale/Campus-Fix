@@ -383,6 +383,143 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Block B'), findsNothing);
       });
+
+      // The wide (medium / expanded) path renders an anchored `MenuAnchor`
+      // instead of a bottom sheet. Its panel measures intrinsic sizes, which a
+      // shrink-wrapping ListView cannot answer.
+      const Map<String, Size> wideWindows = <String, Size>{
+        'medium': Size(800, 1200),
+        'expanded': Size(1280, 900),
+      };
+      for (final MapEntry<String, Size> window in wideWindows.entries) {
+        testWidgets('${window.key}: opens an anchored menu and reports the '
+            'choice', (WidgetTester tester) async {
+          String? picked;
+          await pumpApp(
+            tester,
+            StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) => SizedBox(
+                width: 320,
+                child: AppSelect<String>(
+                  label: 'Building',
+                  options: options,
+                  value: picked,
+                  onChanged: (String v) => setState(() => picked = v),
+                ),
+              ),
+            ),
+            brightness: brightness,
+            size: window.value,
+          );
+          expect(find.text('Select'), findsOneWidget);
+          await tester.tap(find.text('Select'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          // Every option is rendered by the menu.
+          expect(find.text('Block A'), findsOneWidget);
+          expect(find.text('Block B'), findsOneWidget);
+          expect(find.text('Block C'), findsOneWidget);
+          await tester.tap(find.text('Block B'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(picked, 'B');
+          // The menu closed and the field now shows the choice.
+          expect(find.text('Block A'), findsNothing);
+          expect(find.text('Block B'), findsOneWidget);
+        });
+      }
+
+      testWidgets('wide: a long list is capped, scrolls and can be searched', (
+        WidgetTester tester,
+      ) async {
+        final List<AppSelectOption<int>> many = <AppSelectOption<int>>[
+          for (int i = 0; i < 40; i++)
+            AppSelectOption<int>(value: i, label: 'Room $i'),
+        ];
+        int? picked;
+        await pumpApp(
+          tester,
+          StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) => SizedBox(
+              width: 320,
+              child: AppSelect<int>(
+                label: 'Room',
+                options: many,
+                value: picked,
+                onChanged: (int v) => setState(() => picked = v),
+              ),
+            ),
+          ),
+          brightness: brightness,
+          size: const Size(1280, 900),
+        );
+        await tester.tap(find.text('Select'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.byType(AppSearchField), findsOneWidget);
+
+        // Capped: 40 rows are 40 x 48 px tall, the menu is far shorter, and
+        // it is no wider than the 320 px anchor.
+        final Finder scroller = find
+            .ancestor(
+              of: find.text('Room 0'),
+              matching: find.byType(SingleChildScrollView),
+            )
+            .first;
+        final Rect viewport = tester.getRect(scroller);
+        expect(viewport.height, lessThanOrEqualTo(360));
+        expect(viewport.width, lessThanOrEqualTo(320));
+        // Scrolls: the last row starts below the viewport until dragged to.
+        expect(
+          tester.getTopLeft(find.text('Room 39')).dy,
+          greaterThan(viewport.bottom),
+        );
+        await tester.drag(scroller, const Offset(0, -3000));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final Rect last = tester.getRect(find.text('Room 39'));
+        expect(last.top, greaterThanOrEqualTo(viewport.top));
+        expect(last.bottom, lessThanOrEqualTo(viewport.bottom));
+
+        // Searching narrows the list; the survivor is tappable.
+        await tester.enterText(find.byType(TextField).last, 'Room 11');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('Room 2'), findsNothing);
+        // Scoped to the rows: the search field itself now reads "Room 11".
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AppPressable),
+            matching: find.text('Room 11'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(picked, 11);
+      });
+
+      testWidgets('wide: dense select opens and shows a selected row', (
+        WidgetTester tester,
+      ) async {
+        await pumpApp(
+          tester,
+          SizedBox(
+            width: 240,
+            child: AppSelect<String>(
+              dense: true,
+              options: options,
+              value: 'B',
+              onChanged: (String v) {},
+            ),
+          ),
+          brightness: brightness,
+          size: const Size(1280, 900),
+        );
+        await tester.tap(find.text('Block B'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('Block A'), findsOneWidget);
+        expect(find.byIcon(Icons.check), findsOneWidget);
+      });
     });
 
     group('toggles and tiles ($brightness)', () {
