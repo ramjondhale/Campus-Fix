@@ -1,6 +1,7 @@
 import 'package:campusfix_core/campusfix_core.dart';
 import 'package:campusfix_mobile/app.dart';
 import 'package:campusfix_mobile/providers/providers.dart';
+import 'package:campusfix_mobile/router/app_router.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -29,7 +30,12 @@ ProviderContainer testContainer() {
 /// Boots the whole app (router, theme, providers) on a phone-sized view.
 /// Reduced motion is on so skeleton shimmers settle and `pumpAndSettle`
 /// terminates.
-Future<ProviderContainer> pumpCampusFix(WidgetTester tester) async {
+///
+/// [overrides] are added after the standard ones (e.g. a failing repository).
+Future<ProviderContainer> pumpCampusFix(
+  WidgetTester tester, {
+  List<Override> overrides = const <Override>[],
+}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -40,7 +46,7 @@ Future<ProviderContainer> pumpCampusFix(WidgetTester tester) async {
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: testOverrides(),
+      overrides: <Override>[...testOverrides(), ...overrides],
       retry: noAutoRetry,
       child: const CampusFixApp(),
     ),
@@ -58,5 +64,21 @@ Future<void> signInAs(WidgetTester tester, UserRole role) async {
   await tester.tap(find.byKey(ValueKey<String>('demo-${role.name}')));
   await tester.pump();
   await tester.tap(find.text('Sign in'));
+  await tester.pumpAndSettle();
+}
+
+/// Makes the test view tall enough that long, lazily built lists are laid out
+/// in full (call after [pumpCampusFix], which sets a phone-sized view).
+void useTallView(WidgetTester tester, {double height = 4000}) {
+  tester.view.physicalSize = Size(390, height);
+}
+
+/// Opens [location] and settles.
+Future<void> openRoute(
+  WidgetTester tester,
+  ProviderContainer container,
+  String location,
+) async {
+  container.read(appRouterProvider).go(location);
   await tester.pumpAndSettle();
 }

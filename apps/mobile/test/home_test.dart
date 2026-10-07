@@ -68,7 +68,7 @@ void main() {
     );
   });
 
-  testWidgets('bottom nav opens a stubbed feature as Coming soon', (
+  testWidgets('bottom nav opens My Complaints inside the shell', (
     tester,
   ) async {
     await pumpCampusFix(tester);
@@ -82,7 +82,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Coming soon'), findsOneWidget);
+    // The real screen (not the "Coming soon" placeholder), with the nav kept.
+    expect(find.text('Coming soon'), findsNothing);
+    expect(find.byType(ComplaintCard), findsWidgets);
     expect(find.byType(AppBottomNav), findsOneWidget);
   });
 
