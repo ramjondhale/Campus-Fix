@@ -6,6 +6,7 @@ import 'package:campusfix_mobile/router/app_router.dart';
 import 'package:campusfix_mobile/router/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_repositories.dart';
