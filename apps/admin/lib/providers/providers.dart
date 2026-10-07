@@ -6,6 +6,7 @@
 /// may read it (see `complaints.dart`).
 library;
 
+export 'complaint_filter.dart';
 export 'complaint_query.dart';
 export 'complaints.dart';
 export 'dashboard.dart';
