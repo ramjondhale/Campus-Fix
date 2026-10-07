@@ -14,12 +14,17 @@ enum BoardSort {
 
   final String label;
 
-  int compare(PublicComplaintView a, PublicComplaintView b) => switch (this) {
-    BoardSort.priority => _byPriority(a, b),
-    BoardSort.newest => b.createdAt.compareTo(a.createdAt),
-    BoardSort.oldest => a.createdAt.compareTo(b.createdAt),
-    BoardSort.recentlyUpdated => b.updatedAt.compareTo(a.updatedAt),
-  };
+  /// Orders [a] before [b]. Complaints that tie (same priority and time) are
+  /// ordered by ID, highest first, so the order is stable between rebuilds.
+  int compare(PublicComplaintView a, PublicComplaintView b) {
+    final int primary = switch (this) {
+      BoardSort.priority => _byPriority(a, b),
+      BoardSort.newest => b.createdAt.compareTo(a.createdAt),
+      BoardSort.oldest => a.createdAt.compareTo(b.createdAt),
+      BoardSort.recentlyUpdated => b.updatedAt.compareTo(a.updatedAt),
+    };
+    return primary != 0 ? primary : b.id.compareTo(a.id);
+  }
 
   static int _byPriority(PublicComplaintView a, PublicComplaintView b) {
     final int byWeight = b.effectivePriority.weight.compareTo(

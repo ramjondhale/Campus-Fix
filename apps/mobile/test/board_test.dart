@@ -245,25 +245,45 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    List<PublicComplaintView> built() => <PublicComplaintView>[
+      for (final ComplaintCard c in tester.widgetList<ComplaintCard>(
+        find.byType(ComplaintCard),
+      ))
+        c.complaint,
+    ];
+
     await sortBy('Priority', 'Oldest');
+    // Independent of the comparator: the creation times never decrease.
+    final List<PublicComplaintView> asc = built();
+    for (int i = 1; i < asc.length; i++) {
+      expect(asc[i].createdAt.isBefore(asc[i - 1].createdAt), isFalse);
+    }
     expect(shownIds(tester), <String>[
       for (final c in <PublicComplaintView>[
         ...open,
-      ]..sort((a, b) => a.createdAt.compareTo(b.createdAt)))
+      ]..sort(BoardSort.oldest.compare))
         c.id,
     ]);
     await sortBy('Oldest', 'Newest');
+    final List<PublicComplaintView> desc = built();
+    for (int i = 1; i < desc.length; i++) {
+      expect(desc[i].createdAt.isAfter(desc[i - 1].createdAt), isFalse);
+    }
     expect(shownIds(tester), <String>[
       for (final c in <PublicComplaintView>[
         ...open,
-      ]..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
+      ]..sort(BoardSort.newest.compare))
         c.id,
     ]);
     await sortBy('Newest', 'Recently updated');
+    final List<PublicComplaintView> upd = built();
+    for (int i = 1; i < upd.length; i++) {
+      expect(upd[i].updatedAt.isAfter(upd[i - 1].updatedAt), isFalse);
+    }
     expect(shownIds(tester), <String>[
       for (final c in <PublicComplaintView>[
         ...open,
-      ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)))
+      ]..sort(BoardSort.recentlyUpdated.compare))
         c.id,
     ]);
   });
