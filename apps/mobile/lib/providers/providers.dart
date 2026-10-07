@@ -11,3 +11,4 @@ export 'repositories.dart';
 export 'services.dart';
 export 'session.dart';
 export 'work_actions.dart';
+export 'work_item.dart';
