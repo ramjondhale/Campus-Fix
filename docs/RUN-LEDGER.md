@@ -8,15 +8,20 @@ _Last updated: 2026-10-07 — by orchestrator._
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
 - **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report ✅, S4.3+S4.4 reader screens ✅,
-  **S4.5 maintenance flow ✅**. Reporter + maintenance mobile flows are now feature-complete.
-  Resume at **S4.6 (verifier flow)** → S5 (admin web) → S6 (integration).
-- **⚠ Demo-data gap (S6 task):** the stock seed leaves the **demo maintenance login** (`_maintenance.first`
-  = electrician `u-mnt-ele-01`) and likely the demo verifier with an **empty queue**, so a live run shows
-  M-13/M-16 empty states. The flows are fully correct + test-covered (S4.5 tests re-purpose seed complaints
-  via `apps/mobile/test/support/work_fixtures.dart`). Fix at S6 as a **coordinated seed change** — give the
-  demo maintenance + verifier accounts real open work in `seed_data.dart` — updating the dependent core
-  seed-count tests AND the mobile work/verify fixtures together. (A quick demo-account swap was tried and
-  reverted: it breaks the 34 electrician-pinned work tests; the seed itself must change, not just the login.)
+  **S4.5 maintenance flow ✅**, **S4.6 verifier flow ✅**. **The whole mobile app (all 3 roles) is now
+  feature-complete** (reporter, maintenance, verifier). Resume at **S5 (admin web)** → S6 (integration).
+- **Minor cleanup (S6):** M-17 imports `WorkActionBar` + `kNoteVisibilityHelper` from
+  `features/work/work_widgets.dart` (cross-feature). Consider hoisting shared action-bar/note widgets to
+  `features/shared`. Some test finders (`button`/`dialogButton`/`tapButton`) are duplicated across
+  work/verify fixtures. Non-blocking.
+- **⚠ Demo-data gap (S6 task, maintenance only):** the stock seed leaves the **demo maintenance login**
+  (`_maintenance.first` = electrician `u-mnt-ele-01`) with an **empty queue**, so a live run shows **M-13**
+  empty states. **The demo verifier is fine** (4 `resolved` complaints exist, queue isn't department-scoped,
+  so M-16 is populated — confirmed by S4.6). The flows are fully correct + test-covered (S4.5 work tests
+  re-purpose seed complaints via `apps/mobile/test/support/work_fixtures.dart`). Fix at S6 as a **coordinated
+  seed change** — give the demo electrician real open work in `seed_data.dart` — updating the dependent core
+  seed-count tests AND the mobile work fixtures together. (A quick demo-account swap was tried and reverted:
+  it breaks the 34 electrician-pinned work tests; the seed itself must change, not just the login.)
 - **Verify-gate reminder:** after merging any app chunk, re-run BOTH `apps/mobile` tests AND the
   `campusfix_core` suite (core's PR-T14 scans the mobile tree, so mobile changes can break core tests).
 - **⚠ iOS build blocker (see docs/BUILDING.md):** `flutter build ios --simulator` fails with
@@ -60,7 +65,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | S4.3 My Complaints + Details | ✅ | A | merged | (merge) | list (own complaints) + details (timeline/before-after/privacy-safe); design-system-clean. |
 | S4.4 Board + Notifications | ✅ | A | merged | (merge) | anon board (filters/search) + notifications (read state); 106 mobile tests; core guard green. |
 | S4.5 Maintenance flow | ✅ | A | merged | 678c89a | M-13 Assigned Work (To start/In progress/Rework) + M-14 Work Detail (start/claim T3) + M-15 After-Repair resolve (T4); PII-free write controller in providers/work_actions.dart; 157 mobile tests (106+51), core 651 green, no raw colors. |
-| S4.6 Verifier flow | ⬜ | A | | | verify→close. |
+| S4.6 Verifier flow | ✅ | A | merged | 53305c2 | M-16 Verification Queue + M-17 Verify/Reject (verify T5 / reject T7 — **no close on mobile**, close is admin-only T6/web); PII-free verify_actions controller; 199 mobile tests (157+42), core 651 green, no raw colors. Reconciled stale "Verify & Close" spec text (M-17/AC-42/A-04). |
 | S5.1 Admin shell+auth+layout | ⬜ | A | | | responsive web shell. |
 | S5.2 Dashboard | ⬜ | A | | | metric cards + charts. |
 | S5.3 Complaint list + filters | ⬜ | A | | | table + filters. |
@@ -112,6 +117,7 @@ _Last updated: 2026-10-07 — by orchestrator._
 | 14 | 2026-10-07 | f8eaa1a | iOS config fixes (UTF-8 locale, deploy target 15.0) + BUILDING.md (App.framework blocker). |
 | 15 | 2026-10-07 | 2798206 | S4.3+S4.4 reader screens merged (106 mobile tests); CLAUDE.md + hard design-system/foreground rules added. Phase paused for compaction. |
 | 16 | 2026-10-07 | 678c89a | S4.5 maintenance flow merged (M-13/M-14/M-15 + work write controller); 157 mobile tests, core 651 green, analyze clean, no design drift. Demo-data gap logged as S6 task. |
+| 17 | 2026-10-07 | 53305c2 | S4.6 verifier flow merged (M-16/M-17 verify+reject, no mobile close); 199 mobile tests, core 651 green, analyze clean. Mobile app feature-complete. Stale "Verify & Close" spec reconciled; demo-data gap corrected (verifier queue is fine). |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

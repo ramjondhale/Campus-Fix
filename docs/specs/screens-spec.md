@@ -31,7 +31,7 @@ Role abbreviations: **Rp** reporter, **M** maintenance, **V** verifier, **A** ad
 | M-14 | Work Detail (start / progress) | mobile | M | (S1.4/S4.5) |
 | M-15 | After-Repair Upload (resolve) | mobile | M | (S1.4/S4.5), R10 |
 | M-16 | Verification Queue | mobile | V | (S1.4/S4.6) |
-| M-17 | Verify & Close | mobile | V | (S1.4/S4.6), R10 |
+| M-17 | Verify / Reject | mobile | V | (S1.4/S4.6), R10 |
 | A-01 | Admin Login | admin web | A, V | (S5.1) |
 | A-02 | Admin Dashboard | admin web | A, V | Admin Dashboard (S5.2) |
 | A-03 | Complaint List + Filters | admin web | A, V | (S5.3) |
@@ -248,16 +248,21 @@ cleared on successful submit or confirmed discard.
 * **Privacy:** public views only.
 * **Acceptance:** AC-40 only `resolved` complaints appear; AC-41 count equals Home "Awaiting verification".
 
-### M-17 Verify & Close
-* **Purpose:** approve or reject the repair with evidence side by side (R10; T5+T6 or T7).
+### M-17 Verify / Reject
+* **Purpose:** approve or reject the repair with evidence side by side (R10; T5 or T7). **The verifier
+  verifies; it does not close.** Closing a verified complaint (T6) is an **admin-only** action on the web
+  console (A-04) — resolved decision, data-model-spec §7. There is **no Close button on mobile**.
 * **Roles:** V.
 * **Data shown:** BeforeAfter comparison (before vs after photos), resolution note `[DM-2]`, description, location, PriorityTag, timeline `[DM-1]`.
 * **Inputs/actions:** `nextStatuses(resolved, verifier) == [inProgress, verified]`:
-  **Verify & Close** (T5 then T6; optional note; confirm dialog) and **Reject — needs rework** (T7; **required** note, <= 500; confirm).
+  **Verify** (T5 `resolved -> verified`; optional note; confirm dialog) and **Reject — needs rework** (T7
+  `resolved -> inProgress`; **required** note, <= 500; confirm).
 * **Navigation:** in: M-16, M-12; out: M-16 on success (toast).
 * **States:** loading, error + Retry, E-404; if evidence is missing (corrupt data) actions are disabled with the P1/P2 message; stale -> P8 message.
 * **Privacy:** public view only; verifier never sees identity.
-* **Acceptance:** AC-42 Verify & Close ends in `closed` with `verified` then `closed` events; AC-43 Reject without a note is blocked; AC-44 Reject returns status to `inProgress` and notifies the department.
+* **Acceptance:** AC-42 Verify ends in `verified` with one `verified` event (the complaint is **not**
+  closed here — T6/close is admin-only on the web); AC-43 Reject without a note is blocked; AC-44 Reject
+  returns status to `inProgress` and notifies the department.
 
 ---
 
@@ -320,7 +325,8 @@ cleared on successful submit or confirmed discard.
 | **Assign** (status `reviewed`, no route) | A | T2 | department (required, nothing preselected), optional staff member (SC-OI-4) |
 | **Reassign** (status `assigned` / `inProgress`) | A | annotation event / T8 | department (+ optional staff), **reason required** |
 | **Start / Resolve on behalf** | A | T3 / T4 | resolve needs after-photo(s) + resolution note (same form as M-15) |
-| **Verify & Close**, **Close** (status `verified`) | A, V | T5+T6 / T6 | optional note |
+| **Verify** (status `resolved`) | A, V | T5 `resolved -> verified` | optional note |
+| **Close** (status `verified`) | **A only** | T6 `verified -> closed` | optional note (V cannot close) |
 | **Reject — needs rework** | A, V | T7 | **required** note |
 | **Set / clear priority override** | A | n/a (not a status change) | `Priority` or "Clear override"; shows resulting effective priority |
 | **Toggle safety flag** | A | n/a | recomputes priority |
@@ -370,7 +376,7 @@ E-403: "You don't have access to this page" + Go home (G-2). E-404: "We couldn't
 | 13 | Completed | M-15 *Mark resolved* | T4 `inProgress -> resolved` |
 | 14 | After-Repair Photo | M-15 (photos + note); visible in M-10, M-17, A-04 | R10 evidence |
 | 15 | Verification | M-16 -> M-17 (or A-04) | T5 `resolved -> verified` (T7 reject loop) |
-| 16 | Closed | M-17 *Verify & Close* / A-04 | T6 `verified -> closed`; reporter sees it in M-09/M-10/M-12 |
+| 16 | Closed | A-04 *Close* (admin, web only) | T6 `verified -> closed`; reporter sees it in M-09/M-10/M-12. Mobile M-17 stops at `verified` (T5); the admin closes. |
 
 Throughout: Board (M-11) and Notifications (M-12) observe steps 8–16; A-02/A-03 monitor all steps.
 

@@ -10,7 +10,8 @@ College-only complaint & maintenance app. **Flutter mobile + Flutter Web admin**
   **Complete, 651 tests.**
 - `packages/campusfix_design` — theme (tokens, `AppTheme.light/dark`, `ThemeExtension`s) + ~29 reusable
   widgets + gallery. **Complete, 224 tests.** This is the **single source of UI truth**.
-- `apps/mobile` — Flutter app (reporter/maintenance/verifier). In progress.
+- `apps/mobile` — Flutter app (reporter/maintenance/verifier). **Feature-complete** (all 3 role flows;
+  199 tests). Verifier verifies (T5)/rejects (T7) only — **no close on mobile** (close is admin-only, web).
 - `apps/admin` — Flutter Web admin. Not started.
 - `docs/` — PLAN, RUN-LEDGER, ARCHITECTURE, ORCHESTRATION, BUILDING, specs/, design/.
 
@@ -49,11 +50,12 @@ cd apps/admin && flutter run -d chrome
 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.
 
 ## Known issues
-- **Demo-data gap (S6):** the stock seed leaves the demo maintenance login (electrician `u-mnt-ele-01`)
-  and the demo verifier with an empty queue, so M-13/M-16 show empty states on a live run. Flows are
-  correct + test-covered (tests re-purpose seed complaints). Fix at S6 by changing `seed_data.dart` to
-  give those demo accounts real open work, updating core seed-count tests + mobile fixtures together — a
-  mere demo-account swap breaks the electrician-pinned work tests. See RUN-LEDGER "Demo-data gap".
+- **Demo-data gap (S6, maintenance only):** the stock seed leaves the demo maintenance login (electrician
+  `u-mnt-ele-01`) with an **empty queue**, so **M-13** shows empty states on a live run. (The demo verifier
+  is fine — 4 `resolved` complaints exist and the queue isn't department-scoped, so **M-16 is populated**.)
+  Flows are correct + test-covered (work tests re-purpose seed complaints). Fix at S6 by changing
+  `seed_data.dart` to give the demo electrician real open work, updating core seed-count tests + mobile
+  `work_fixtures.dart` together — a mere demo-account swap breaks the electrician-pinned work tests.
 - **iOS simulator build blocked:** `flutter build ios --simulator` fails with `App.framework: No such
   file` despite UTF-8 locale + iOS 15.0 deployment target + clean pods. Likely a Flutter 3.41/Xcode
   pipeline quirk — try building `ios/Runner.xcworkspace` in Xcode directly. See
