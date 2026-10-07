@@ -313,9 +313,14 @@ final dashboardClockProvider = Provider<DateTime Function()>(
   (ref) => DateTime.now,
 );
 
+// The derived providers below are auto-disposed: they hold nothing worth
+// keeping once the dashboard is closed (the range choice above is what
+// survives), and a provider that outlives its screen would be stale against
+// `allComplaintsProvider` the next time the console is opened after a sign-in.
+
 /// The complaints created inside the selected range (public views).
 final dashboardComplaintsProvider =
-    Provider<AsyncValue<List<PublicComplaintView>>>((ref) {
+    Provider.autoDispose<AsyncValue<List<PublicComplaintView>>>((ref) {
       final CreatedRange range = ref.watch(dashboardRangeProvider);
       final DateTime now = ref.watch(dashboardClockProvider)();
       return ref
@@ -324,31 +329,40 @@ final dashboardComplaintsProvider =
     });
 
 /// The metric-card and chart counts for the selected range.
-final dashboardMetricsProvider = Provider<AsyncValue<DashboardMetrics>>(
-  (ref) =>
-      ref.watch(dashboardComplaintsProvider).whenData(computeDashboardMetrics),
-);
+final dashboardMetricsProvider =
+    Provider.autoDispose<AsyncValue<DashboardMetrics>>(
+      (ref) => ref
+          .watch(dashboardComplaintsProvider)
+          .whenData(computeDashboardMetrics),
+    );
 
 /// Intake per day over the last [kIntakeDays] days. A fixed trailing window,
 /// not narrowed by the range control.
-final dashboardIntakeProvider = Provider<AsyncValue<List<IntakeDay>>>((ref) {
-  final DateTime now = ref.watch(dashboardClockProvider)();
-  return ref
-      .watch(allComplaintsProvider)
-      .whenData((all) => intakePerDay(all, now));
-});
+final dashboardIntakeProvider =
+    Provider.autoDispose<AsyncValue<List<IntakeDay>>>((ref) {
+      final DateTime now = ref.watch(dashboardClockProvider)();
+      return ref
+          .watch(allComplaintsProvider)
+          .whenData((all) => intakePerDay(all, now));
+    });
 
 /// The Needs attention list for the selected range.
-final dashboardNeedsAttentionProvider = Provider<AsyncValue<DashboardList>>(
-  (ref) => ref.watch(dashboardComplaintsProvider).whenData(needsAttentionOf),
-);
+final dashboardNeedsAttentionProvider =
+    Provider.autoDispose<AsyncValue<DashboardList>>(
+      (ref) =>
+          ref.watch(dashboardComplaintsProvider).whenData(needsAttentionOf),
+    );
 
 /// The Oldest unresolved list for the selected range.
-final dashboardOldestUnresolvedProvider = Provider<AsyncValue<DashboardList>>(
-  (ref) => ref.watch(dashboardComplaintsProvider).whenData(oldestUnresolvedOf),
-);
+final dashboardOldestUnresolvedProvider =
+    Provider.autoDispose<AsyncValue<DashboardList>>(
+      (ref) =>
+          ref.watch(dashboardComplaintsProvider).whenData(oldestUnresolvedOf),
+    );
 
 /// The Awaiting manual triage list for the selected range.
-final dashboardAwaitingTriageProvider = Provider<AsyncValue<DashboardList>>(
-  (ref) => ref.watch(dashboardComplaintsProvider).whenData(awaitingTriageOf),
-);
+final dashboardAwaitingTriageProvider =
+    Provider.autoDispose<AsyncValue<DashboardList>>(
+      (ref) =>
+          ref.watch(dashboardComplaintsProvider).whenData(awaitingTriageOf),
+    );

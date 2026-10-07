@@ -134,6 +134,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
     expect(find.byType(AdminSideNav), findsOneWidget);
+
+    // The dashboard behind it now loads the complaints (400 ms of latency).
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('an unexpected failure keeps the input and offers Retry', (
@@ -167,10 +171,7 @@ void main() {
     final AppUser user = demoAccount(UserRole.admin).user;
     expect(container.read(sessionProvider), user);
     expect(find.text('Sign in to the admin console'), findsNothing);
-    expect(
-      find.text('The dashboard arrives in a later release.'),
-      findsOneWidget,
-    );
+    expect(find.text('Status breakdown'), findsOneWidget);
     expect(find.byType(AdminSideNav), findsOneWidget);
     expect(find.text(user.displayName), findsOneWidget);
   });
@@ -181,10 +182,7 @@ void main() {
 
     final AppUser user = demoAccount(UserRole.verifier).user;
     expect(container.read(sessionProvider), user);
-    expect(
-      find.text('The dashboard arrives in a later release.'),
-      findsOneWidget,
-    );
+    expect(find.text('Status breakdown'), findsOneWidget);
     expect(find.text(user.displayName), findsOneWidget);
     expect(find.text('Verifier'), findsWidgets);
   });

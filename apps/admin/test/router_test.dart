@@ -213,7 +213,7 @@ void main() {
 
       final String id = testSeed.complaints.first.id;
       for (final (String path, String body) in <(String, String)>[
-        (AppRoutes.dashboard, 'The dashboard arrives in a later release.'),
+        (AppRoutes.dashboard, 'Status breakdown'),
         (
           AppRoutes.complaints,
           'The complaint list arrives in a later release.',
@@ -312,10 +312,7 @@ void main() {
     expect(find.text('Page not found'), findsOneWidget);
     await tester.tap(find.text('Go to dashboard'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('The dashboard arrives in a later release.'),
-      findsOneWidget,
-    );
+    expect(find.text('Status breakdown'), findsOneWidget);
   });
 
   testWidgets(
