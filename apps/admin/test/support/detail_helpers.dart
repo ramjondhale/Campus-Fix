@@ -34,6 +34,9 @@ Future<ProviderContainer> openDetail(
   List<Override> overrides = const <Override>[],
   Duration latency = Duration.zero,
 }) async {
+  // A second call in one test starts from a fresh app: drop the previous one
+  // (and its session) first.
+  await tester.pumpWidget(const SizedBox.shrink());
   final ProviderContainer container = await pumpAdmin(
     tester,
     size: size,

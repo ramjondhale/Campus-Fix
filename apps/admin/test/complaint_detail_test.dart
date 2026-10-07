@@ -340,4 +340,315 @@ void main() {
       expect(barLabels(tester), <String>['Close']);
     });
   });
+
+  group('what the screen shows', () {
+    testWidgets('admin header: ID, status, effective priority with the '
+        'Overridden marker, category, location, dates', (tester) async {
+      await openDetail(tester, UserRole.admin, kAssignedOverridden);
+      final Complaint c = seed(kAssignedOverridden);
+
+      expect(find.byType(ComplaintIdText), findsOneWidget);
+      expect(find.text(c.id), findsOneWidget);
+      expect(
+        tester.widget<StatusBadge>(find.byType(StatusBadge)).status,
+        ComplaintStatus.assigned,
+      );
+      // The effective priority (the override) with the marker ...
+      final PriorityTag header = tester
+          .widgetList<PriorityTag>(find.byType(PriorityTag))
+          .first;
+      expect(header.priority, Priority.high);
+      expect(header.overridden, isTrue);
+      // ... in the header and beside the effective priority of the panel.
+      expect(find.byType(OverriddenMarker), findsNWidgets(2));
+      expect(find.byType(CategoryChip), findsOneWidget);
+      expect(find.textContaining(c.building), findsWidgets);
+      expect(find.textContaining('Created '), findsOneWidget);
+      expect(find.textContaining('Updated '), findsOneWidget);
+      expect(find.textContaining('Waiting '), findsOneWidget);
+    });
+
+    testWidgets('a resolved complaint shows no Waiting figure', (tester) async {
+      await openDetail(tester, UserRole.admin, kResolvedIt);
+      expect(find.textContaining('Waiting '), findsNothing);
+    });
+
+    testWidgets('the Priority panel: computed, override, inputs and aging '
+        '(admin only)', (tester) async {
+      await openDetail(tester, UserRole.admin, kAssignedOverridden);
+      final Complaint c = seed(kAssignedOverridden);
+
+      expect(find.byType(PriorityPanel), findsOneWidget);
+      final String text = detailText(tester);
+      for (final String s in <String>[
+        'Effective priority',
+        'Computed priority',
+        'Override',
+        c.severity.label,
+        c.peopleAffected.label,
+        'Not flagged',
+        'Aging',
+      ]) {
+        expect(text, contains(s), reason: s);
+      }
+      // Computed (medium) and effective (high) differ, both are shown.
+      final List<Priority> tags = <Priority>[
+        for (final PriorityTag t in tester.widgetList<PriorityTag>(
+          find.descendant(
+            of: find.byType(PriorityPanel),
+            matching: find.byType(PriorityTag),
+          ),
+        ))
+          t.priority,
+      ];
+      expect(tags, <Priority>[Priority.high, Priority.medium, Priority.high]);
+    });
+
+    testWidgets('the admin Assignment panel: department, assignee name and '
+        'ID, who and when, Auto / Manual', (tester) async {
+      await openDetail(tester, UserRole.admin, kInProgressManual);
+      final Complaint c = seed(kInProgressManual);
+      expect(c.assignment!.isManual, isTrue);
+
+      final String text = detailText(tester);
+      expect(text, contains(c.assignment!.department.label));
+      expect(text, contains('Nitin Bhosale · MNT-CIV-02'));
+      expect(text, contains('Sandeep Kapoor · ADM-01'));
+      expect(text, contains(formatAbsoluteTime(c.assignment!.assignedAt)));
+      expect(find.text('Manual'), findsOneWidget);
+
+      // An auto-routed one says Auto.
+      await openDetail(tester, UserRole.admin, kResolvedIt);
+      expect(find.text('Auto'), findsOneWidget);
+      expect(find.text('Manual'), findsNothing);
+    });
+
+    testWidgets('an unassigned complaint says so', (tester) async {
+      await openDetail(tester, UserRole.admin, kReportedPlumbing);
+      expect(find.text('Not assigned yet'), findsOneWidget);
+      expect(find.text('Assignee'), findsNothing);
+    });
+
+    testWidgets('the admin timeline names the actor (name, ID) and the '
+        'role, plus the note', (tester) async {
+      await openDetail(tester, UserRole.admin, kResolvedIt);
+
+      final List<TimelineItem> items = tester
+          .widgetList<TimelineItem>(find.byType(TimelineItem))
+          .toList();
+      expect(items, hasLength(seed(kResolvedIt).timeline.length));
+      expect(items.map((i) => i.adminActorLine).toList(), <String?>[
+        null, // the reporter: role only
+        'Kiran Joshi · VER-01',
+        'Kiran Joshi · VER-01',
+        'Nikhil Sawant · MNT-IT-02',
+        'Nikhil Sawant · MNT-IT-02',
+      ]);
+      expect(items.map((i) => i.actorRole).toList(), <UserRole>[
+        UserRole.reporter,
+        UserRole.verifier,
+        UserRole.verifier,
+        UserRole.maintenance,
+        UserRole.maintenance,
+      ]);
+      expect(find.text('Auto-routed to IT Team'), findsOneWidget);
+    });
+
+    testWidgets('a rework (T7) is marked on the timeline', (tester) async {
+      await openDetail(tester, UserRole.admin, 'CF-2026-00017');
+      expect(
+        tester
+            .widgetList<TimelineItem>(find.byType(TimelineItem))
+            .where((i) => i.isRework),
+        hasLength(1),
+      );
+      expect(find.text('Rework'), findsOneWidget);
+    });
+
+    testWidgets('description, photos, the Before / After comparator and the '
+        'resolution note', (tester) async {
+      await openDetail(tester, UserRole.verifier, kResolvedIt);
+      final Complaint c = seed(kResolvedIt);
+
+      expect(find.text(c.description), findsOneWidget);
+      expect(find.byType(BeforeAfter), findsOneWidget);
+      expect(
+        find.byType(PhotoThumbnail),
+        findsNWidgets(c.beforePhotos.length + c.afterPhotos.length),
+      );
+      expect(find.text('Resolution note'), findsOneWidget);
+      expect(find.text(c.resolutionNote!), findsWidgets);
+
+      // No after photos yet: no comparator, no resolution note.
+      await openDetail(tester, UserRole.verifier, kReportedPlumbing);
+      expect(find.byType(BeforeAfter), findsNothing);
+      expect(find.text('Resolution note'), findsNothing);
+    });
+
+    testWidgets('a photo opens large and closes again', (tester) async {
+      await openDetail(tester, UserRole.admin, kReportedPlumbing);
+      await tapVisible(tester, find.byType(PhotoThumbnail).first);
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+      await tester.tap(find.byTooltip('Close photo'));
+      await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsNothing);
+    });
+  });
+
+  group('AC-53 manage actions: shown by status and role', () {
+    // status -> (complaint, admin labels, verifier labels)
+    final Map<ComplaintStatus, (String, List<String>, List<String>)> table =
+        <ComplaintStatus, (String, List<String>, List<String>)>{
+          ComplaintStatus.reported: (
+            kReportedPlumbing,
+            <String>['Review & Route'],
+            <String>['Review & Route'],
+          ),
+          ComplaintStatus.reviewed: (
+            kReviewedSafety,
+            <String>['Assign'],
+            <String>[],
+          ),
+          ComplaintStatus.assigned: (
+            kAssignedCarpenter,
+            <String>['Start work on behalf', 'Reassign'],
+            <String>[],
+          ),
+          ComplaintStatus.inProgress: (
+            kInProgressElectrical,
+            <String>['Reassign', 'Resolve on behalf'],
+            <String>[],
+          ),
+          ComplaintStatus.resolved: (
+            kResolvedIt,
+            <String>['Verify', 'Reject — needs rework'],
+            <String>['Verify', 'Reject — needs rework'],
+          ),
+          ComplaintStatus.verified: (
+            kVerifiedCivil,
+            <String>['Close'],
+            <String>[],
+          ),
+          ComplaintStatus.closed: (kClosedFurniture, <String>[], <String>[]),
+        };
+
+    for (final ComplaintStatus status in ComplaintStatus.values) {
+      testWidgets('${status.label}: what an admin and a verifier are offered', (
+        tester,
+      ) async {
+        final (String id, List<String> admin, List<String> verifier) =
+            table[status]!;
+        await openDetail(tester, UserRole.admin, id);
+        expect(barLabels(tester), admin, reason: 'admin, ${status.label}');
+        await openDetail(tester, UserRole.verifier, id);
+        expect(
+          barLabels(tester),
+          verifier,
+          reason: 'verifier, ${status.label}',
+        );
+      });
+    }
+
+    testWidgets('a closed complaint is read-only: a banner, no action and '
+        'no priority edit (INV-4)', (tester) async {
+      for (final UserRole role in <UserRole>[
+        UserRole.admin,
+        UserRole.verifier,
+      ]) {
+        await openDetail(tester, role, kClosedFurniture);
+        expect(find.text('This complaint is closed'), findsOneWidget);
+        expect(barLabels(tester), isEmpty);
+        expect(buttonIn('Set priority override'), findsNothing);
+        expect(buttonIn('Flag as safety issue'), findsNothing);
+        expect(find.byType(AppDialog), findsNothing);
+      }
+    });
+
+    testWidgets('a verifier on a reviewed, unrouted complaint is told an '
+        'admin assigns it (AC-55)', (tester) async {
+      await openDetail(tester, UserRole.verifier, kReviewedSafety);
+      expect(buttonIn('Assign'), findsNothing);
+      expect(find.textContaining('An admin assigns it'), findsOneWidget);
+    });
+
+    testWidgets('Verify is disabled with the rule\'s reason when the repair '
+        'evidence is missing; Reject stays open', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+      );
+      await writeComplaint(
+        tester,
+        container,
+        seed(kResolvedIt).copyWith(
+          afterPhotos: const <Attachment>[],
+          clearResolutionNote: true,
+        ),
+      );
+
+      expect(isEnabled(tester, barButton('Verify')), isFalse);
+      expect(isEnabled(tester, barButton('Reject — needs rework')), isTrue);
+      expect(
+        find.text(
+          'Add at least one after-repair photo. Add a resolution note.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the safety flag is disabled with the reason once resolved '
+        'and on a Safety complaint', (tester) async {
+      await openDetail(tester, UserRole.admin, kResolvedIt);
+      expect(isEnabled(tester, buttonIn('Flag as safety issue')), isFalse);
+      expect(
+        find.text('The safety flag cannot change once the repair is done.'),
+        findsOneWidget,
+      );
+      expect(isEnabled(tester, buttonIn('Set priority override')), isTrue);
+
+      await openDetail(tester, UserRole.admin, 'CF-2026-00021');
+      expect(isEnabled(tester, buttonIn('Remove safety flag')), isFalse);
+      expect(
+        find.text('A Safety complaint is always flagged.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Reject needs a reason: the button stays disabled until '
+        'there is one', (tester) async {
+      await openDetail(tester, UserRole.verifier, kResolvedIt);
+      await tapVisible(tester, barButton('Reject — needs rework'));
+
+      expect(find.byType(AppDialog), findsOneWidget);
+      expect(isEnabled(tester, dialogButton('Reject')), isFalse);
+
+      await tester.enterText(find.byType(EditableText).last, '   ');
+      await tester.pump();
+      expect(isEnabled(tester, dialogButton('Reject')), isFalse);
+
+      await tester.enterText(find.byType(EditableText).last, 'Still leaking');
+      await tester.pump();
+      expect(isEnabled(tester, dialogButton('Reject')), isTrue);
+    });
+
+    testWidgets('Cancel closes the dialog and changes nothing', (tester) async {
+      final ProviderContainer container = await openDetail(
+        tester,
+        UserRole.verifier,
+        kResolvedIt,
+      );
+      await tapVisible(tester, barButton('Verify'));
+      expect(find.byType(AppDialog), findsOneWidget);
+
+      await tester.tap(dialogButton('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDialog), findsNothing);
+      expect(
+        (await storedComplaint(tester, container, kResolvedIt)).status,
+        ComplaintStatus.resolved,
+      );
+    });
+  });
 }
