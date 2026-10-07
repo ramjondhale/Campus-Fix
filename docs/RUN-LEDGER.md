@@ -3,13 +3,20 @@
 Single source of truth for progress. **Resume point:** first non-✅ chunk whose deps are ✅.
 Status: ⬜ not started · 🟡 in progress · 🔵 in review (merged, verifying) · ✅ done · ⛔ blocked.
 
-_Last updated: 2026-10-06 — by orchestrator._
+_Last updated: 2026-10-07 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report ✅, S4.3+S4.4 reader screens ✅.
-  **⏸ PAUSED for context compaction (user request).** Resume at **S4.5 (maintenance flow)** → S4.6
-  (verifier) → S5 (admin web) → S6 (integration). Reporter-facing mobile app is now feature-complete.
+- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report ✅, S4.3+S4.4 reader screens ✅,
+  **S4.5 maintenance flow ✅**. Reporter + maintenance mobile flows are now feature-complete.
+  Resume at **S4.6 (verifier flow)** → S5 (admin web) → S6 (integration).
+- **⚠ Demo-data gap (S6 task):** the stock seed leaves the **demo maintenance login** (`_maintenance.first`
+  = electrician `u-mnt-ele-01`) and likely the demo verifier with an **empty queue**, so a live run shows
+  M-13/M-16 empty states. The flows are fully correct + test-covered (S4.5 tests re-purpose seed complaints
+  via `apps/mobile/test/support/work_fixtures.dart`). Fix at S6 as a **coordinated seed change** — give the
+  demo maintenance + verifier accounts real open work in `seed_data.dart` — updating the dependent core
+  seed-count tests AND the mobile work/verify fixtures together. (A quick demo-account swap was tried and
+  reverted: it breaks the 34 electrician-pinned work tests; the seed itself must change, not just the login.)
 - **Verify-gate reminder:** after merging any app chunk, re-run BOTH `apps/mobile` tests AND the
   `campusfix_core` suite (core's PR-T14 scans the mobile tree, so mobile changes can break core tests).
 - **⚠ iOS build blocker (see docs/BUILDING.md):** `flutter build ios --simulator` fails with
@@ -52,7 +59,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S4.2 Report-a-Problem flow | ✅ | A | merged | (ff) | Category→Location→Photos→Details→Review→Submit→Confirmation(ID+priority); draft state + privacy-safe submit controller; 59 mobile tests. Fixed pre-existing core PR-T14 regex (UserRole.reporter false-positive) + allow-listed boundary provider. |
 | S4.3 My Complaints + Details | ✅ | A | merged | (merge) | list (own complaints) + details (timeline/before-after/privacy-safe); design-system-clean. |
 | S4.4 Board + Notifications | ✅ | A | merged | (merge) | anon board (filters/search) + notifications (read state); 106 mobile tests; core guard green. |
-| S4.5 Maintenance flow | ⬜ | A | | | assigned→progress→after-repair. |
+| S4.5 Maintenance flow | ✅ | A | merged | 678c89a | M-13 Assigned Work (To start/In progress/Rework) + M-14 Work Detail (start/claim T3) + M-15 After-Repair resolve (T4); PII-free write controller in providers/work_actions.dart; 157 mobile tests (106+51), core 651 green, no raw colors. |
 | S4.6 Verifier flow | ⬜ | A | | | verify→close. |
 | S5.1 Admin shell+auth+layout | ⬜ | A | | | responsive web shell. |
 | S5.2 Dashboard | ⬜ | A | | | metric cards + charts. |
@@ -103,7 +110,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 12 | 2026-10-07 | d0f0e7f | S4.1 merged: mobile app shell (router/providers/login/nav + stubs); 33 tests. First runnable app. |
 | 13 | 2026-10-07 | de60521 | S4.2 merged: Report-a-Problem flow (59 mobile tests) + fixed core PR-T14 guard regression; core 651 green. |
 | 14 | 2026-10-07 | f8eaa1a | iOS config fixes (UTF-8 locale, deploy target 15.0) + BUILDING.md (App.framework blocker). |
-| 15 | 2026-10-07 | _this commit_ | S4.3+S4.4 reader screens merged (106 mobile tests); CLAUDE.md + hard design-system/foreground rules added. Phase paused for compaction. |
+| 15 | 2026-10-07 | 2798206 | S4.3+S4.4 reader screens merged (106 mobile tests); CLAUDE.md + hard design-system/foreground rules added. Phase paused for compaction. |
+| 16 | 2026-10-07 | 678c89a | S4.5 maintenance flow merged (M-13/M-14/M-15 + work write controller); 157 mobile tests, core 651 green, analyze clean, no design drift. Demo-data gap logged as S6 task. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

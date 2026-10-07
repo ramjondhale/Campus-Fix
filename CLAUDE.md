@@ -49,6 +49,11 @@ cd apps/admin && flutter run -d chrome
 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.
 
 ## Known issues
+- **Demo-data gap (S6):** the stock seed leaves the demo maintenance login (electrician `u-mnt-ele-01`)
+  and the demo verifier with an empty queue, so M-13/M-16 show empty states on a live run. Flows are
+  correct + test-covered (tests re-purpose seed complaints). Fix at S6 by changing `seed_data.dart` to
+  give those demo accounts real open work, updating core seed-count tests + mobile fixtures together — a
+  mere demo-account swap breaks the electrician-pinned work tests. See RUN-LEDGER "Demo-data gap".
 - **iOS simulator build blocked:** `flutter build ios --simulator` fails with `App.framework: No such
   file` despite UTF-8 locale + iOS 15.0 deployment target + clean pods. Likely a Flutter 3.41/Xcode
   pipeline quirk — try building `ios/Runner.xcworkspace` in Xcode directly. See
