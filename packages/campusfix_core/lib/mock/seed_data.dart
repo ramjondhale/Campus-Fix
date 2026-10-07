@@ -72,7 +72,8 @@ class SeedData {
   final List<MockAccount> accounts;
 
   /// One account per role for the "Demo accounts" quick-fill: the first
-  /// reporter, an electrician, a verifier and the admin.
+  /// reporter, an IT Team maintenance worker (whose queue is populated in the
+  /// seed), a verifier and the admin.
   final List<MockAccount> demoAccounts;
 
   /// The seed complaints, oldest first (ascending Complaint ID).
@@ -1150,7 +1151,14 @@ class _SeedBuilder {
     final demoAccounts = [
       for (final u in [
         _reporters.first.user,
-        _maintenance.first,
+        // Deepak Naik (IT Team), picked by id rather than list position: the
+        // first maintenance user (the electrician) has an empty queue in this
+        // seed, so M-13 Assigned Work and the maintenance Home would only show
+        // empty states. u-mnt-it-01 already has a To-start job (CF-2026-00022)
+        // and a Rework job (CF-2026-00017, rejected by the verifier), plus a
+        // colleague-claimed job (CF-2026-00019) that the queue must hide, so
+        // the demo is populated without touching any seed complaint.
+        _maintenance.firstWhere((u) => u.id == 'u-mnt-it-01'),
         _verifiers.first,
         _admin,
       ])

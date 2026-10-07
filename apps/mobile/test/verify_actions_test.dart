@@ -187,7 +187,8 @@ void main() {
 
     test('a rejected job reappears in the maintenance worker\'s Rework tab '
         'and leaves the verification queue (AC-44)', () async {
-      final MockComplaintRepository repository = verifyRepository();
+      final MockComplaintRepository repository =
+          verifyRepositoryWithDemoWorkerJob();
       final ProviderContainer verifier = await verifyContainer(
         repository: repository,
       );
@@ -201,7 +202,8 @@ void main() {
           .reject(criticalElectrical, note: 'Still sparking.');
       expect(result!.ok, isTrue);
 
-      // The electrician (the job's assignee) sees it under Rework, with the
+      // The maintenance worker holding the job (the demo worker, see
+      // verifyRepositoryWithDemoWorkerJob) sees it under Rework, with the
       // verifier's reason as the latest public timeline note.
       final ProviderContainer maintenance = await verifyContainer(
         repository: repository,

@@ -57,12 +57,12 @@ Future<void> tapButton(WidgetTester tester, String label) async {
 String pathOf(ProviderContainer container) =>
     container.read(appRouterProvider).state.uri.path;
 
-/// Signs the demo electrician in and opens the work queue from Home.
+/// Signs the demo maintenance worker in and opens the work queue from Home.
 Future<ProviderContainer> openWork(
   WidgetTester tester, {
   ComplaintRepository? repository,
 }) async {
-  final ProviderContainer container = await signedInAsElectrician(
+  final ProviderContainer container = await signedInAsMaintenance(
     tester,
     repository: repository,
   );
@@ -71,7 +71,7 @@ Future<ProviderContainer> openWork(
   return container;
 }
 
-Future<ProviderContainer> signedInAsElectrician(
+Future<ProviderContainer> signedInAsMaintenance(
   WidgetTester tester, {
   ComplaintRepository? repository,
 }) async {
@@ -88,13 +88,13 @@ Future<ProviderContainer> signedInAsElectrician(
   return container;
 }
 
-/// Opens [location] as the signed-in electrician.
+/// Opens [location] as the signed-in maintenance worker.
 Future<ProviderContainer> openAt(
   WidgetTester tester,
   String location, {
   ComplaintRepository? repository,
 }) async {
-  final ProviderContainer container = await signedInAsElectrician(
+  final ProviderContainer container = await signedInAsMaintenance(
     tester,
     repository: repository,
   );
@@ -130,7 +130,7 @@ void main() {
   group('M-13 Assigned Work', () {
     testWidgets('three tabs list the right jobs, most urgent then oldest '
         'first, and the counts equal Home (AC-33, AC-34)', (tester) async {
-      final ProviderContainer container = await signedInAsElectrician(tester);
+      final ProviderContainer container = await signedInAsMaintenance(tester);
 
       // Home counts first.
       final List<String> homeCounts = <String>[
@@ -219,7 +219,10 @@ void main() {
     ) async {
       await openWork(tester, repository: MockComplaintRepository());
 
-      expect(find.text('No work assigned to Electrician'), findsOneWidget);
+      expect(
+        find.text('No work assigned to $meDepartmentLabel'),
+        findsOneWidget,
+      );
       expect(find.byType(ComplaintCard), findsNothing);
       expect(find.text('To start (0)'), findsOneWidget);
     });
@@ -227,7 +230,7 @@ void main() {
     testWidgets('an empty tab says what it is for while the others have '
         'work', (tester) async {
       // A queue with only one to-start job.
-      final ProviderContainer container = await signedInAsElectrician(
+      final ProviderContainer container = await signedInAsMaintenance(
         tester,
         repository: MockComplaintRepository(
           initial: <Complaint>[
@@ -242,7 +245,7 @@ void main() {
       await tester.tap(find.text('In progress (0)'));
       await tester.pumpAndSettle();
       expect(find.text('Nothing in progress'), findsOneWidget);
-      expect(find.text('No work assigned to Electrician'), findsNothing);
+      expect(find.text('No work assigned to $meDepartmentLabel'), findsNothing);
 
       await tester.tap(find.text('Rework (0)'));
       await tester.pumpAndSettle();
