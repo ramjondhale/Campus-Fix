@@ -7,7 +7,10 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** S3 design package COMPLETE → **Wave 5 (mobile app, S4)** next.
+- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅; S4.2 report flow next.
+- **⚠ Orchestration note:** background Sonnet agents are stalling on a stream watchdog (3 stalls). Running
+  app agents in the **foreground** works reliably (S4.1 succeeded that way) but forces **serial** execution
+  (no ≤4 parallel for now). Revert to parallel background when the stream recovers.
 - **Trunk:** `main` (agent branches `agent/<chunk-id>` cut from it).
 - **Baseline:** **`campusfix_core` COMPLETE — 651 tests green, analyze clean** (models, 8 enums, views,
   priority engine, status machine + validateTransition, assignment, privacy, mock repos + seed [29
@@ -36,7 +39,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S2.7 Services | ✅ | A | merged | a0b4466 | ComplaintService (executor, per-complaint locking, INV-4/5, P4/N15) + NotificationService (canonical templates); +113 tests (651 total). |
 | S3.1 Theme & tokens | ✅ | A | merged | 62603b0 | token classes, google_fonts typography, 4 ThemeExtensions, AppTheme light/dark + component themes + context helpers; 66 tests, analyze clean. |
 | S3.2 Reusable widgets | ✅ | A | merged | dd01ef4 | 29 PII-free widgets + gallery + example app + architecture guard; 224 tests, analyze clean. Agent stalled pre-commit; orchestrator verified+committed+merged. |
-| S4.1 Mobile shell + auth | ⬜ | A | | | router+riverpod+mock login. |
+| S4.1 Mobile shell + auth | ✅ | A | merged | 79f744d | go_router + providers (privacy boundary) + mock login + role-aware shell/home + 7 feature stubs; 33 tests, analyze clean. (foreground agent; 2 prior bg stalls.) Reporter nav = Home/My Complaints/Board/Alerts per spec; Report is a Home CTA. |
 | S4.2 Report-a-Problem flow | ⬜ | A | | | full submission flow. |
 | S4.3 My Complaints + Details | ⬜ | A | | | list + timeline + before/after. |
 | S4.4 Board + Notifications | ⬜ | A | | | anon board + notifications. |
@@ -87,7 +90,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 8 | 2026-10-06 | 8dcfb8b | S1.1 design foundations merged (design-system.md + published style-guide Artifact); 8 design decisions logged. |
 | 9 | 2026-10-06 | 4d9cafa | S2.7 merged: ComplaintService + NotificationService; core layer COMPLETE at 651 tests. |
 | 10 | 2026-10-06 | 1d2fc99 | S3.1 merged: Flutter theme (tokens, typography, ThemeExtensions, AppTheme light/dark); 66 tests. |
-| 11 | 2026-10-07 | _this commit_ | S3.2 merged: 29-widget library + gallery + example; 224 tests. Design package complete. |
+| 11 | 2026-10-07 | c5aad09 | S3.2 merged: 29-widget library + gallery + example; 224 tests. Design package complete. |
+| 12 | 2026-10-07 | _this commit_ | S4.1 merged: mobile app shell (router/providers/login/nav + stubs); 33 tests. First runnable app. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;
