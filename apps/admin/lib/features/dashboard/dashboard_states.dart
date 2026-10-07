@@ -55,7 +55,7 @@ class ChartSkeleton extends StatelessWidget {
           for (int i = 0; i < rows; i++)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: AppSpace.s1),
-              child: SkeletonBlock(height: 12),
+              child: SkeletonBlock(height: AppSpace.s3),
             ),
         ],
       ),
