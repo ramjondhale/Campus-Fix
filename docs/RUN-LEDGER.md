@@ -7,7 +7,9 @@ _Last updated: 2026-10-06 — by orchestrator._
 
 ## Current state
 - **Phase:** 1 (design system + clickable prototype).
-- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅; S4.2 report flow next.
+- **Active wave:** Wave 5 (mobile app) — S4.1 shell ✅, S4.2 report flow ✅; S4.3 next.
+- **Verify-gate reminder:** after merging any app chunk, re-run BOTH `apps/mobile` tests AND the
+  `campusfix_core` suite (core's PR-T14 scans the mobile tree, so mobile changes can break core tests).
 - **⚠ Orchestration note:** background Sonnet agents are stalling on a stream watchdog (3 stalls). Running
   app agents in the **foreground** works reliably (S4.1 succeeded that way) but forces **serial** execution
   (no ≤4 parallel for now). Revert to parallel background when the stream recovers.
@@ -40,7 +42,7 @@ _Last updated: 2026-10-06 — by orchestrator._
 | S3.1 Theme & tokens | ✅ | A | merged | 62603b0 | token classes, google_fonts typography, 4 ThemeExtensions, AppTheme light/dark + component themes + context helpers; 66 tests, analyze clean. |
 | S3.2 Reusable widgets | ✅ | A | merged | dd01ef4 | 29 PII-free widgets + gallery + example app + architecture guard; 224 tests, analyze clean. Agent stalled pre-commit; orchestrator verified+committed+merged. |
 | S4.1 Mobile shell + auth | ✅ | A | merged | 79f744d | go_router + providers (privacy boundary) + mock login + role-aware shell/home + 7 feature stubs; 33 tests, analyze clean. (foreground agent; 2 prior bg stalls.) Reporter nav = Home/My Complaints/Board/Alerts per spec; Report is a Home CTA. |
-| S4.2 Report-a-Problem flow | ⬜ | A | | | full submission flow. |
+| S4.2 Report-a-Problem flow | ✅ | A | merged | (ff) | Category→Location→Photos→Details→Review→Submit→Confirmation(ID+priority); draft state + privacy-safe submit controller; 59 mobile tests. Fixed pre-existing core PR-T14 regex (UserRole.reporter false-positive) + allow-listed boundary provider. |
 | S4.3 My Complaints + Details | ⬜ | A | | | list + timeline + before/after. |
 | S4.4 Board + Notifications | ⬜ | A | | | anon board + notifications. |
 | S4.5 Maintenance flow | ⬜ | A | | | assigned→progress→after-repair. |
@@ -91,7 +93,8 @@ _Last updated: 2026-10-06 — by orchestrator._
 | 9 | 2026-10-06 | 4d9cafa | S2.7 merged: ComplaintService + NotificationService; core layer COMPLETE at 651 tests. |
 | 10 | 2026-10-06 | 1d2fc99 | S3.1 merged: Flutter theme (tokens, typography, ThemeExtensions, AppTheme light/dark); 66 tests. |
 | 11 | 2026-10-07 | c5aad09 | S3.2 merged: 29-widget library + gallery + example; 224 tests. Design package complete. |
-| 12 | 2026-10-07 | _this commit_ | S4.1 merged: mobile app shell (router/providers/login/nav + stubs); 33 tests. First runnable app. |
+| 12 | 2026-10-07 | d0f0e7f | S4.1 merged: mobile app shell (router/providers/login/nav + stubs); 33 tests. First runnable app. |
+| 13 | 2026-10-07 | _this commit_ | S4.2 merged: Report-a-Problem flow (59 mobile tests) + fixed core PR-T14 guard regression; core 651 green. |
 
 ## Event / decision log
 - 2026-10-06 — Kickoff. Product-owner decisions: Flutter mobile + Flutter Web admin; prototype-first;

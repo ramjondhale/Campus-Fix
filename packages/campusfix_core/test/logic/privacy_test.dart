@@ -936,7 +936,12 @@ void main() {
     // controller that builds the draft Complaint from the signed-in user.
     // S4.2 added its path here (and only here).
     const mobileReporterAllowList = <String>{
+      // The submit controller builds a ReporterIdentity from the signed-in user.
       'apps/mobile/lib/providers/report_submit.dart',
+      // The privacy-boundary provider: it reads raw Complaints (PII) and maps to
+      // PublicComplaintView, incl. the "my complaints" ownership filter on
+      // reporter.userId (privacy-spec §5.3). It is the data boundary, not a widget.
+      'apps/mobile/lib/providers/complaints.dart',
     };
     const adminIdentityPanel =
         'apps/admin/lib/features/complaint_detail/identity_panel.dart';
@@ -1267,7 +1272,8 @@ Directory? _findRepoRoot() {
 final _blockComment = RegExp(r'/\*[\s\S]*?\*/');
 final _lineComment = RegExp(r'//[^\n]*');
 final _reporterType = RegExp(r'\bReporterIdentity\b');
-final _reporterAccess = RegExp(r'\.reporter\b');
+// `.reporter` property access, but NOT the `UserRole.reporter` enum value.
+final _reporterAccess = RegExp(r'(?<!UserRole)\.reporter\b');
 final _adminViewType = RegExp(r'\bAdminComplaintView\b');
 final _logCall = RegExp(r'(?<![\w.])(print|debugPrint|log)\s*\(');
 
