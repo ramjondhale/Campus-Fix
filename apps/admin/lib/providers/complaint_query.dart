@@ -109,8 +109,9 @@ enum CreatedRange {
 
 /// The path of the complaint list (A-03) with the given filters in its query.
 ///
-/// Only the filters that are set appear, always in the canonical order of the
-/// table above, so the same filter always yields the same URL. CSV values keep
+/// Only the filters that are set appear, always in one canonical order (the
+/// two toggles, then status, priority, category, department, building, search,
+/// and `created` last), so the same filter always yields the same URL. CSV values keep
 /// their commas literal (`priority=critical,high`); free text is
 /// percent-encoded. With no filter at all the result is the bare
 /// `/complaints`.
@@ -132,6 +133,8 @@ String complaintsPathWith({
     if (list.isNotEmpty) pairs.add('$key=${list.join(',')}');
   }
 
+  if (unresolved) pairs.add('$kQueryUnresolved=$kQueryFlagOn');
+  if (triage) pairs.add('$kQueryTriage=$kQueryFlagOn');
   csv(kQueryStatus, statuses.map((ComplaintStatus s) => s.name));
   csv(kQueryPriority, priorities.map((Priority p) => p.name));
   csv(kQueryCategory, categories.map((ProblemCategory c) => c.name));
@@ -145,8 +148,6 @@ String complaintsPathWith({
   if (search != null && search.isNotEmpty) {
     pairs.add('$kQuerySearch=${Uri.encodeQueryComponent(search)}');
   }
-  if (unresolved) pairs.add('$kQueryUnresolved=$kQueryFlagOn');
-  if (triage) pairs.add('$kQueryTriage=$kQueryFlagOn');
   if (created != null) pairs.add('$kQueryCreated=${created.queryValue}');
 
   return pairs.isEmpty
