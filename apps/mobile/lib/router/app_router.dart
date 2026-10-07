@@ -10,6 +10,10 @@ import '../features/home/home_screen.dart';
 import '../features/login/login_screen.dart';
 import '../features/my_complaints/my_complaints_screen.dart';
 import '../features/notifications/notifications_screen.dart';
+import '../features/report/category_step.dart';
+import '../features/report/location_step.dart';
+import '../features/report/photos_step.dart';
+import '../features/report/report_flow.dart';
 import '../features/report/report_stub_screen.dart';
 import '../features/verify/verify_screens.dart';
 import '../features/work/work_screens.dart';
@@ -179,17 +183,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.reportCategory,
         builder: (context, state) =>
-            _guard(_reporter, const ReportStubScreen(title: 'Category')),
+            _guard(_reporter, CategoryStep(edit: isEditMode(state))),
       ),
       GoRoute(
         path: AppRoutes.reportLocation,
         builder: (context, state) =>
-            _guard(_reporter, const ReportStubScreen(title: 'Location')),
+            _guard(_reporter, LocationStep(edit: isEditMode(state))),
       ),
       GoRoute(
         path: AppRoutes.reportPhotos,
         builder: (context, state) =>
-            _guard(_reporter, const ReportStubScreen(title: 'Photos')),
+            _guard(_reporter, PhotosStep(edit: isEditMode(state))),
       ),
       GoRoute(
         path: AppRoutes.reportDetails,
