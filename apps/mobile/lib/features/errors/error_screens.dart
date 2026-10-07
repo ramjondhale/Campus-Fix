@@ -13,13 +13,7 @@ class NotAuthorizedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: EmptyState(
-          icon: Icons.lock_outline,
-          title: "You don't have access to this page",
-          message: 'Your role cannot open this screen.',
-          actionLabel: 'Go home',
-          onAction: () => context.go(AppRoutes.home),
-        ),
+        child: EmptyState.forbidden(onAction: () => context.go(AppRoutes.home)),
       ),
     );
   }
@@ -34,11 +28,9 @@ class NotFoundScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: EmptyState(
-          icon: Icons.search_off,
+        child: EmptyState.notFound(
           title: 'Page not found',
           message: "This page doesn't exist or isn't available to you.",
-          actionLabel: 'Go home',
           onAction: () => context.go(AppRoutes.home),
         ),
       ),
