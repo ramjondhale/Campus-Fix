@@ -136,13 +136,31 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpace.s4,
                       ),
-                      child: Text(
-                        shown.length == 1
-                            ? '1 complaint'
-                            : '${shown.length} complaints',
-                        style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      child: Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              shown.length == 1
+                                  ? '1 complaint'
+                                  : '${shown.length} complaints',
+                              style: Theme.of(context).textTheme.bodySmall!
+                                  .copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                          // The filter row scrolls sideways; keep a way to
+                          // reset in view.
+                          if (_filters.hasActive)
+                            AppButton(
+                              label: 'Clear filters',
+                              size: AppButtonSize.sm,
+                              variant: AppButtonVariant.tertiary,
+                              onPressed: _clear,
+                            ),
+                        ],
                       ),
                     ),
                     Expanded(
