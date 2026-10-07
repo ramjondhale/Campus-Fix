@@ -91,6 +91,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final CampusColors colors = context.campusColors;
     final List<MockAccount> demoAccounts = kShowDemoAccounts
         ? <MockAccount>[
             for (final MockAccount a
@@ -110,7 +111,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: context.campusColors.card,
+                  color: colors.card,
                   borderRadius: AppRadius.br5,
                   border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
