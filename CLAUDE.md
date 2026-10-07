@@ -59,10 +59,6 @@ cd apps/admin && flutter run -d chrome
 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.
 
 ## Known issues
-- **`AppSelect` broken on wide windows (S6 design fix):** `campusfix_design`'s `AppSelect` throws
-  "RenderShrinkWrappingViewport does not support returning intrinsic dimensions" on non-compact windows
-  (`ListView(shrinkWrap:true)` inside its `MenuAnchor`; only the compact bottom-sheet path is tested). Admin
-  S5.4 worked around it with `AppFilterChip` toggle chips. Fix the widget + add a wide-window test.
 - **Demo-data gap (S6, maintenance only):** the stock seed leaves the demo maintenance login (electrician
   `u-mnt-ele-01`) with an **empty queue**, so **M-13** shows empty states on a live run. (The demo verifier
   is fine — 4 `resolved` complaints exist and the queue isn't department-scoped, so **M-16 is populated**.)
