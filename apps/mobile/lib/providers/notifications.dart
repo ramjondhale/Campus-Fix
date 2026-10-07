@@ -1,6 +1,7 @@
 import 'package:campusfix_core/campusfix_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'complaints.dart';
 import 'services.dart';
 import 'session.dart';
 
@@ -41,3 +42,47 @@ Future<void> refreshNotifications(WidgetRef ref) async {
     // Shown by the screens as an error state with Retry.
   }
 }
+
+/// Marks one notification read (screens-spec M-12: tapping an item). The list
+/// updates through the repository's change stream.
+Future<void> markNotificationRead(WidgetRef ref, String id) async {
+  await ref.read(notificationServiceProvider).markRead(id);
+}
+
+/// Marks all of the signed-in user's notifications read ("Mark all as read").
+Future<void> markAllNotificationsRead(WidgetRef ref) async {
+  final user = ref.read(sessionProvider);
+  if (user == null) return;
+  await ref.read(notificationServiceProvider).markAllRead(user.id);
+}
+
+/// The IDs of the complaints the signed-in user can still open from a
+/// notification (screens-spec M-12): a reporter's own complaints, a
+/// maintenance worker's queue, a verifier's verification queue. Anything else
+/// is "No longer available". Built from the public role providers, so no raw
+/// complaint is involved. Empty for any other role.
+final reachableComplaintIdsProvider = Provider<AsyncValue<Set<String>>>((ref) {
+  final user = ref.watch(sessionProvider);
+  switch (user?.role) {
+    case UserRole.reporter:
+      return ref
+          .watch(myComplaintsProvider)
+          .whenData((mine) => {for (final c in mine) c.id});
+    case UserRole.maintenance:
+      return ref
+          .watch(workQueueProvider)
+          .whenData(
+            (q) => {
+              for (final c in [...q.toStart, ...q.inProgress, ...q.rework])
+                c.id,
+            },
+          );
+    case UserRole.verifier:
+      return ref
+          .watch(verificationQueueProvider)
+          .whenData((waiting) => {for (final c in waiting) c.id});
+    case UserRole.admin:
+    case null:
+      return const AsyncData(<String>{});
+  }
+});

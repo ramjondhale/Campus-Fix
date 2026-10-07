@@ -126,7 +126,32 @@ void main() {
     expect(find.text('Page not found'), findsOneWidget);
   });
 
-  testWidgets('every still-stubbed route renders its Coming soon screen', (
+  testWidgets('the reporter read screens render for real (no placeholders)', (
+    tester,
+  ) async {
+    final container = await pumpCampusFix(tester);
+    final router = container.read(appRouterProvider);
+
+    await signInAs(tester, UserRole.reporter);
+    final String own = testSeed.complaints
+        .firstWhere(
+          (c) => c.reporter.userId == demoAccount(UserRole.reporter).user.id,
+        )
+        .id;
+    for (final path in <String>[
+      AppRoutes.complaints,
+      AppRoutes.complaint(own),
+      AppRoutes.board,
+      AppRoutes.boardItem(own),
+      AppRoutes.notifications,
+    ]) {
+      router.go(path);
+      await tester.pumpAndSettle();
+      expect(find.text('Coming soon'), findsNothing, reason: path);
+    }
+  });
+
+  testWidgets('an unknown complaint ID shows E-404 on both detail routes', (
     tester,
   ) async {
     final container = await pumpCampusFix(tester);
@@ -134,15 +159,12 @@ void main() {
 
     await signInAs(tester, UserRole.reporter);
     for (final path in <String>[
-      AppRoutes.complaints,
-      AppRoutes.complaint('CF-2026-00001'),
-      AppRoutes.board,
-      AppRoutes.boardItem('CF-2026-00001'),
-      AppRoutes.notifications,
+      AppRoutes.complaint('CF-2026-99999'),
+      AppRoutes.boardItem('CF-2026-99999'),
     ]) {
       router.go(path);
       await tester.pumpAndSettle();
-      expect(find.text('Coming soon'), findsOneWidget, reason: path);
+      expect(find.text("We couldn't find that complaint"), findsOneWidget);
     }
   });
 }
