@@ -1,3 +1,4 @@
+import 'package:campusfix_admin/features/complaint_detail/complaint_detail_screen.dart';
 import 'package:campusfix_admin/features/dashboard/dashboard_layout.dart';
 import 'package:campusfix_admin/features/complaints/complaint_filter_bar.dart';
 import 'package:campusfix_admin/features/complaints/complaint_list_screen.dart';
@@ -1172,7 +1173,7 @@ void main() {
       expect(location(container), AppRoutes.complaint(id));
       expect(Uri.parse(location(container)).query, isEmpty);
       expect(
-        find.text('Complaint details arrives in a later release.'),
+        find.byType(ComplaintDetailScreen),
         findsOneWidget,
       );
     });

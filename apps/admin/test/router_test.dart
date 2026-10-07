@@ -1,3 +1,4 @@
+import 'package:campusfix_admin/features/complaint_detail/complaint_detail_screen.dart';
 import 'package:campusfix_admin/features/complaints/complaint_list_screen.dart';
 import 'package:campusfix_admin/features/errors/error_screens.dart';
 import 'package:campusfix_admin/providers/providers.dart';
@@ -139,7 +140,7 @@ void main() {
     await signInAs(tester, UserRole.admin);
     expect(router.state.uri.path, AppRoutes.complaint(id));
     expect(
-      find.text('Complaint details arrives in a later release.'),
+      find.byType(ComplaintDetailScreen),
       findsOneWidget,
     );
     expect(find.text(_loginSubtitle), findsNothing);
@@ -218,7 +219,7 @@ void main() {
         (AppRoutes.complaints, find.byType(ComplaintListScreen)),
         (
           AppRoutes.complaint(id),
-          find.text('Complaint details arrives in a later release.'),
+          find.byType(ComplaintDetailScreen),
         ),
       ]) {
         router.go(path);

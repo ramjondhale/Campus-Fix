@@ -1,3 +1,4 @@
+import 'package:campusfix_admin/features/complaint_detail/complaint_detail_screen.dart';
 import 'package:campusfix_admin/features/complaints/complaint_list_screen.dart';
 import 'package:campusfix_admin/providers/providers.dart';
 import 'package:campusfix_admin/router/app_router.dart';
@@ -110,7 +111,7 @@ void main() {
       expect(sideNav(tester).selectedIndex, 1);
       expect(inTopBar('Complaint details'), findsOneWidget);
       expect(
-        find.text('Complaint details arrives in a later release.'),
+        find.byType(ComplaintDetailScreen),
         findsOneWidget,
       );
 

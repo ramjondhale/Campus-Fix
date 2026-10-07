@@ -285,9 +285,15 @@ bool mayTakeAction(ManageAction action, UserRole role) => switch (action) {
 /// An action on offer, enabled or disabled with the reason.
 @immutable
 class ManageActionOption {
-  const ManageActionOption(this.action, {this.disabledReason});
+  const ManageActionOption(this.action, {this.disabledReason, String? label})
+    : _label = label;
 
   final ManageAction action;
+  final String? _label;
+
+  /// The button label: the action's own, unless the state calls for a more
+  /// specific one ("Remove safety flag").
+  String get label => _label ?? action.label;
 
   /// Why the action cannot be taken right now (the unmet precondition, in the
   /// words of the core rule); `null` when it can.
@@ -369,8 +375,9 @@ List<ManageActionOption> manageActionsFor(
 /// complaint, which is always flagged (core rule SF).
 List<ManageActionOption> priorityActionsFor(
   PublicComplaintView c,
-  UserRole role,
-) {
+  UserRole role, {
+  bool hasOverride = false,
+}) {
   if (role != UserRole.admin || c.status.isTerminal) {
     return const <ManageActionOption>[];
   }
@@ -381,10 +388,14 @@ List<ManageActionOption> priorityActionsFor(
       ? 'A Safety complaint is always flagged.'
       : null;
   return <ManageActionOption>[
-    const ManageActionOption(ManageAction.setPriorityOverride),
+    ManageActionOption(
+      ManageAction.setPriorityOverride,
+      label: hasOverride ? 'Change priority override' : null,
+    ),
     ManageActionOption(
       ManageAction.toggleSafetyFlag,
       disabledReason: flagBlocked,
+      label: c.safetyFlag ? 'Remove safety flag' : 'Flag as safety issue',
     ),
   ];
 }
