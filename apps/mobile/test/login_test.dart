@@ -1,5 +1,6 @@
 import 'package:campusfix_core/campusfix_core.dart';
 import 'package:campusfix_mobile/providers/providers.dart';
+import 'package:campusfix_design/campusfix_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,8 +11,7 @@ void main() {
     await pumpCampusFix(tester);
 
     expect(find.text('Sign in with your ID number'), findsOneWidget);
-    expect(find.text('ID number'), findsOneWidget);
-    expect(find.text('Password'), findsOneWidget);
+    expect(find.byType(AppTextField), findsNWidgets(2)); // ID + password
     expect(find.text('Demo accounts'), findsOneWidget);
     for (final role in <UserRole>[
       UserRole.reporter,
