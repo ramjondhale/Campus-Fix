@@ -4,6 +4,8 @@ library;
 
 export 'complaints.dart';
 export 'notifications.dart';
+export 'report_draft.dart';
+export 'report_submit.dart';
 export 'repositories.dart';
 export 'services.dart';
 export 'session.dart';
