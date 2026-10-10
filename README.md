@@ -9,7 +9,7 @@ Report it. Route it. Fix it. Verify it. Without ever exposing who reported it.
 [![Dart](https://img.shields.io/badge/Dart-3.11-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth%20%C2%B7%20Firestore%20%C2%B7%20Hosting-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
 [![Material 3](https://img.shields.io/badge/Material-3-6750A4?logo=materialdesign&logoColor=white)](https://m3.material.io)
-[![Tests](https://img.shields.io/badge/tests-1%2C455%20passing-brightgreen)](#tests)
+[![Tests](https://img.shields.io/badge/tests-1%2C500%20passing-brightgreen)](#tests)
 [![Demo](https://img.shields.io/badge/demo-live-0F766E)](https://campus-fix-a8e09.web.app)
 
 [**Live demo**](https://campus-fix-a8e09.web.app) ·
@@ -248,7 +248,7 @@ Phase 2 MVP milestones (see the [MVP plan](https://ramjondhale.github.io/Campus-
 - [x] **C2** Read path: the public / admin / identity document split, rules-enforced
 - [x] **C3** Write path: complaint writes through the Firebase repositories, with rules enforcing
       transitions and admin-only close, plus the audited identity reveal
-- [ ] **C4** In-app notifications on Firestore (feed and unread badge)
+- [x] **C4** In-app notifications on Firestore (feed and unread badge)
 - [ ] **C5** Hosting and demo polish: the admin web is live; the Android build and end-to-end verification remain
 
 After the MVP:

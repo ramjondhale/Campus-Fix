@@ -16,8 +16,8 @@
 //   * the allocated Complaint ID comes from the counter, not from the service;
 //   * priorities are recomputed from the REAL inputs for every role (a
 //     placeholder-based recompute would silently lower them);
-//   * the no-op notification producer keeps writes independent of the user
-//     directory;
+//   * the C4 notification producer (`FirebaseNotificationService`) keeps writes
+//     independent of the user directory and addresses the stored Complaint ID;
 //   * the Dart port of the rules has not drifted from `backend/firestore.rules`
 //     (the public key set, the transition table, and the two read decisions:
 //     `private/admin` is signed-in-readable, `private/identity` admin-only).
@@ -66,6 +66,10 @@ const Set<String> _adminKeys = <String>{
   'assignment',
   'timeline',
 };
+
+/// The seven keys of a stored `private/admin` document: the six admin-view keys
+/// plus the non-PII `reporterId` (`validPrivateAdmin`, MVP delta (g)).
+const Set<String> _adminDocKeys = <String>{..._adminKeys, 'reporterId'};
 
 const Set<String> _identityKeys = <String>{
   'userId',
@@ -131,9 +135,15 @@ void _checkNewComplaint(AppUser viewer, String id, NewComplaintDocs docs) {
     'first event is by the caller\'s role',
   );
   _require(
-    docs.adminDoc.keys.every(_adminKeys.contains) &&
+    docs.adminDoc.keys.toSet().containsAll(_adminDocKeys) &&
+        _adminDocKeys.containsAll(docs.adminDoc.keys) &&
         (docs.adminDoc['timeline']! as List<Object?>).length == 1,
-    'private/admin key set and timeline length',
+    'private/admin key set (hasOnly + hasAll) and timeline length',
+  );
+  _require(
+    docs.adminDoc['reporterId'] is String &&
+        docs.adminDoc['reporterId'] == viewer.id,
+    'private/admin.reporterId must be the submitter (create rule)',
   );
   _require(
     docs.identityDoc.keys.every(_identityKeys.contains) &&
@@ -148,6 +158,7 @@ void _checkUpdate({
   required AppUser viewer,
   required Map<String, dynamic> prev,
   required Map<String, dynamic> next,
+  required Map<String, dynamic> prevAdmin,
   required Map<String, dynamic> nextAdmin,
   required ComplaintUpdatePlan plan,
 }) {
@@ -196,9 +207,16 @@ void _checkUpdate({
     _require(appended == 0 || appended == 1, 'same-status edit appends 0 or 1');
   }
   _require(
-    nextAdmin.keys.every(_adminKeys.contains) &&
+    nextAdmin.keys.toSet().containsAll(_adminDocKeys) &&
+        _adminDocKeys.containsAll(nextAdmin.keys) &&
         (nextAdmin['timeline'] as List<Object?>).length == after.length,
-    'private/admin key set and timeline length',
+    'private/admin key set (hasOnly + hasAll) and timeline length',
+  );
+  _require(
+    nextAdmin['reporterId'] is String &&
+        (nextAdmin['reporterId'] as String).isNotEmpty &&
+        nextAdmin['reporterId'] == prevAdmin['reporterId'],
+    'private/admin.reporterId is required and immutable',
   );
   // staffClaims create / delete: the claimer or an admin.
   for (final String? uid in <String?>[plan.releaseClaimOf, plan.takeClaimFor]) {
@@ -302,6 +320,7 @@ class _FakeFirestoreComplaints implements ComplaintRepository {
       viewer: v,
       prev: doc.publicDoc,
       next: nextPublic,
+      prevAdmin: doc.adminDoc,
       nextAdmin: nextAdmin,
       plan: plan,
     );
@@ -352,6 +371,39 @@ class _NoDirectory implements UserRepository {
       Future<List<AppUser>>.error(StateError('directory read'));
 }
 
+/// The producer's two lookups answered from the fake Firestore: the reporter
+/// uid from the stored `private/admin`, the roster built like the seed does.
+class _StoredRecipients implements NotificationRecipientSource {
+  _StoredRecipients(this._repo, Iterable<AppUser> users)
+    : _roster = StaffRoster(
+        maintenance: <String, List<String>>{
+          for (final Department d in Department.values)
+            d.name: <String>[
+              for (final AppUser u in users)
+                if (u.role == UserRole.maintenance && u.department == d) u.id,
+            ],
+        },
+        verifiers: <String>[
+          for (final AppUser u in users)
+            if (u.role == UserRole.verifier) u.id,
+        ],
+        admins: <String>[
+          for (final AppUser u in users)
+            if (u.role == UserRole.admin) u.id,
+        ],
+      );
+
+  final _FakeFirestoreComplaints _repo;
+  final StaffRoster _roster;
+
+  @override
+  Future<String?> reporterIdOf(String complaintId) async =>
+      _repo.docs[complaintId]?.adminDoc['reporterId'] as String?;
+
+  @override
+  Future<StaffRoster> staffRoster() async => _roster;
+}
+
 // ---------------------------------------------------------------------------
 // The world a scenario runs in
 // ---------------------------------------------------------------------------
@@ -362,7 +414,7 @@ final DateTime t0 = DateTime.utc(2026, 10, 6, 9);
 DateTime at(int hours) => t0.add(Duration(hours: hours));
 
 class _World {
-  _World._(this.seed, this.repo, this.service);
+  _World._(this.seed, this.repo, this.notifications, this.service);
 
   factory _World() {
     final SeedData seed = SeedData.build();
@@ -372,6 +424,7 @@ class _World {
     return _World._(
       seed,
       repo,
+      notifications,
       ComplaintService(
         complaints: repo,
         notifications: notifications,
@@ -379,7 +432,10 @@ class _World {
         // The service's own generator is ahead of the counter on purpose: the
         // stored ID must come from the counter.
         ids: ComplaintIdGenerator(initialCounters: <int, int>{2026: 500}),
-        notificationService: DeferredNotificationService(
+        // The real C4 producer, with a user directory that must never be read
+        // (a non-admin client cannot list users).
+        notificationService: FirebaseNotificationService.withSource(
+          recipients: _StoredRecipients(repo, seed.users),
           notifications: notifications,
           users: const _NoDirectory(),
         ),
@@ -390,6 +446,7 @@ class _World {
 
   final SeedData seed;
   final _FakeFirestoreComplaints repo;
+  final MockNotificationRepository notifications;
   final ComplaintService service;
 
   AppUser get reporter => seed.userById('u-rep-01')!;
@@ -613,6 +670,66 @@ void main() {
     );
 
     test(
+      'validPrivateAdmin requires exactly the seven admin keys (reporterId '
+      'included), a string reporterId bound to the submitter and immutable',
+      () {
+        final String rules = File(rulesPath).readAsStringSync();
+        final RegExpMatch? fn = RegExp(
+          r'function validPrivateAdmin\(id\)\s*\{([\s\S]*?)\n    \}',
+        ).firstMatch(rules);
+        expect(fn, isNotNull, reason: 'validPrivateAdmin() not found');
+        Set<String> keysOf(String call) {
+          final RegExpMatch? m = RegExp(
+            '$call\\(\\[([^\\]]*)\\]',
+          ).firstMatch(fn!.group(1)!);
+          expect(m, isNotNull, reason: '$call(...) not found');
+          return <String>{
+            for (final RegExpMatch k in RegExp(
+              r"'([^']+)'",
+            ).allMatches(m!.group(1)!))
+              k.group(1)!,
+          };
+        }
+
+        expect(keysOf('hasOnly'), _adminDocKeys);
+        expect(keysOf('hasAll'), _adminDocKeys);
+        expect(
+          fn!.group(1),
+          contains('d.reporterId is string && d.reporterId.size() > 0'),
+        );
+        final RegExpMatch? admin = RegExp(
+          r'match /private/admin \{([\s\S]*?)\n      \}',
+        ).firstMatch(rules);
+        expect(admin, isNotNull);
+        expect(
+          admin!.group(1),
+          contains('request.resource.data.reporterId == request.auth.uid'),
+        );
+        expect(
+          admin.group(1),
+          contains(
+            'request.resource.data.reporterId == resource.data.reporterId',
+          ),
+        );
+      },
+      skip: haveRules ? false : skip,
+    );
+
+    test(
+      'rosters are readable by any signed-in user and never client-writable',
+      () {
+        final String rules = File(rulesPath).readAsStringSync();
+        final RegExpMatch? m = RegExp(
+          r'match /rosters/\{doc\} \{\s*allow get, list:\s*if ([^;]+);\s*allow write:\s*if ([^;]+);',
+        ).firstMatch(rules);
+        expect(m, isNotNull, reason: 'match /rosters/{doc} not found');
+        expect(m!.group(1), 'signedIn()');
+        expect(m.group(2), 'false');
+      },
+      skip: haveRules ? false : skip,
+    );
+
+    test(
       'close is admin-only and the identity document can never be updated',
       () {
         final String rules = File(rulesPath).readAsStringSync();
@@ -672,7 +789,12 @@ void main() {
       expect(doc.publicDoc['version'], 1);
       expect(doc.publicDoc['claimed'], false);
       expect(doc.publicDoc['status'], 'reported');
-      expect(doc.adminDoc.keys.toSet(), _adminKeys);
+      expect(doc.adminDoc.keys.toSet(), _adminDocKeys);
+      expect(
+        doc.adminDoc['reporterId'],
+        w.reporter.id,
+        reason: 'the opaque uid, for the owner notification',
+      );
       expect(doc.identity.keys.toSet(), _identityKeys);
       expect(doc.identity['userId'], w.reporter.id);
       expect(w.repo.owned, contains('${w.reporter.id}/${first.id}'));
@@ -703,6 +825,118 @@ void main() {
       expect(second.id, 'CF-2026-00002');
     });
   });
+
+  // -------------------------------------------------------------------------
+  group(
+    'private/admin.reporterId (the opaque uid for the owner notification)',
+    () {
+      /// `seen` moved to `reviewed` by a verifier (a blank-reporter complaint).
+      Future<(_World, Complaint, Complaint)> reviewed() async {
+        final _World w = _World();
+        final Complaint filed = await w.submit();
+        final Complaint seen = await w.read(w.verifier, filed.id);
+        final Complaint next = seen.copyWith(
+          status: ComplaintStatus.reviewed,
+          timeline: <StatusEvent>[
+            ...seen.timeline,
+            StatusEvent(
+              id: 'ev-${filed.id}-02',
+              status: ComplaintStatus.reviewed,
+              actorId: w.verifier.id,
+              actorRole: UserRole.verifier,
+              at: at(1),
+            ),
+          ],
+          updatedAt: at(1),
+        );
+        return (w, seen, next);
+      }
+
+      test(
+        'submit writes the reporter uid and nothing else of the reporter',
+        () async {
+          final _World w = _World();
+          final Complaint filed = await w.submit();
+          final NewComplaintDocs docs = newComplaintDocs(filed);
+
+          expect(docs.adminDoc['reporterId'], w.reporter.id);
+          expect(docs.adminDoc.keys.toSet(), _adminDocKeys);
+          final String text = jsonEncode(
+            firestoreToJson(docs.adminDoc),
+          ).toLowerCase();
+          for (final String pii in <String>[
+            w.reporter.displayName,
+            w.reporter.idNumber,
+            w.reporter.email,
+          ]) {
+            expect(text, isNot(contains(pii.toLowerCase())), reason: pii);
+          }
+        },
+      );
+
+      test('an update carries the stored uid over (the actor is not the '
+          'reporter, so next.reporter is blank)', () async {
+        final (_World w, Complaint seen, Complaint next) = await reviewed();
+        expect(next.reporter.userId, isEmpty);
+
+        final ComplaintUpdatePlan plan = planComplaintUpdate(
+          storedPublic: w.repo.docs[seen.id]!.publicDoc,
+          storedAdmin: w.repo.docs[seen.id]!.adminDoc,
+          next: next,
+          expectedVersion: 1,
+        );
+        expect(plan.adminFields['reporterId'], w.reporter.id);
+        expect(plan.adminFields.keys.toSet(), _adminDocKeys);
+      });
+
+      test('the stored uid wins over the assembled one', () async {
+        final (_World w, Complaint seen, Complaint next) = await reviewed();
+        final ComplaintUpdatePlan plan = planComplaintUpdate(
+          storedPublic: w.repo.docs[seen.id]!.publicDoc,
+          storedAdmin: w.repo.docs[seen.id]!.adminDoc,
+          next: next.copyWith(reporter: w.identityOf(w.admin)),
+          expectedVersion: 1,
+        );
+        expect(plan.adminFields['reporterId'], w.reporter.id);
+      });
+
+      test('a document from before C4 is back-filled from the assembled '
+          'reporter, else refused (never an empty uid)', () async {
+        final (_World w, Complaint seen, Complaint next) = await reviewed();
+        final Map<String, dynamic> legacy = <String, dynamic>{
+          ...w.repo.docs[seen.id]!.adminDoc,
+        }..remove('reporterId');
+        final Map<String, dynamic> publicDoc = w.repo.docs[seen.id]!.publicDoc;
+
+        final ComplaintUpdatePlan owner = planComplaintUpdate(
+          storedPublic: publicDoc,
+          storedAdmin: legacy,
+          next: next.copyWith(reporter: w.identityOf(w.reporter)),
+          expectedVersion: 1,
+        );
+        expect(owner.adminFields['reporterId'], w.reporter.id);
+
+        expect(
+          () => planComplaintUpdate(
+            storedPublic: publicDoc,
+            storedAdmin: legacy,
+            next: next,
+            expectedVersion: 1,
+          ),
+          throwsStateError,
+        );
+        expect(
+          () => planComplaintUpdate(
+            storedPublic: publicDoc,
+            storedAdmin: null,
+            next: next,
+            expectedVersion: 1,
+          ),
+          throwsStateError,
+        );
+      });
+    },
+  );
 
   // -------------------------------------------------------------------------
   group('every role\'s transition commits against the rules', () {
@@ -826,6 +1060,10 @@ void main() {
         (adminTimeline[3]! as Map<String, dynamic>)['actorId'],
         worker.id,
       );
+
+      // reporterId was carried over by every write, whoever made it (the
+      // assembled complaint of a non-owner has a blank reporter).
+      expect(doc.adminDoc['reporterId'], w.reporter.id);
 
       // Closed is immutable: every further action is blocked (never written).
       final Complaint closed = await w.read(w.admin, id);
@@ -969,20 +1207,111 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  group('notifications are deferred (C3)', () {
+  group('notifications over the Firebase write path (C4)', () {
     final SeedData seed = SeedData.build();
     final Complaint c = seed.complaints.first;
 
-    test('DeferredNotificationService produces nothing and never reads the '
-        'user directory', () async {
-      final MockNotificationRepository store = MockNotificationRepository();
-      final DeferredNotificationService service = DeferredNotificationService(
-        notifications: store,
-        users: const _NoDirectory(),
+    Future<List<AppNotification>> inbox(_World w, AppUser u) =>
+        w.notifications.byRecipient(u.id);
+
+    test(
+      'submit notifies the owner and the admins under the STORED id',
+      () async {
+        final _World w = _World();
+        final Complaint filed = await w.submit();
+
+        expect(
+          filed.id,
+          'CF-2026-00001',
+          reason: 'from the counter, not 00501',
+        );
+        final List<AppNotification> all = await w.notifications.all();
+        expect(all, hasLength(2));
+        for (final AppNotification n in all) {
+          expect(n.complaintId, 'CF-2026-00001');
+          expect(n.id, startsWith('ntf-ev-CF-2026-00001-01-'));
+          expect(n.body, contains('CF-2026-00001'));
+          expect('${n.id} ${n.body}', isNot(contains('00501')));
+        }
+        expect(
+          <String>{for (final AppNotification n in all) n.recipientId},
+          <String>{w.reporter.id, w.admin.id},
+        );
+      },
+    );
+
+    test('every role\'s write fans out without the user directory, to the '
+        'right people', () async {
+      final _World w = _World();
+      final String id = await w.toVerified();
+      final AppUser worker = w.staff(Department.electrician);
+
+      // Review & Route (verifier): T1 owner-only, T2 owner + the department.
+      final List<AppNotification> reporterInbox = await inbox(w, w.reporter);
+      expect(
+        reporterInbox.map((AppNotification n) => n.title).toSet(),
+        containsAll(<String>[
+          'Complaint submitted',
+          'Complaint reviewed',
+          'Complaint assigned',
+          'Work started',
+          'Repair completed',
+          'Repair verified',
+        ]),
       );
-      expect(await service.buildFor(null, c, c.timeline.first), isEmpty);
-      expect(await service.emitFor(null, c, c.timeline.first), isEmpty);
-      expect(await store.all(), isEmpty);
+      for (final AppNotification n in reporterInbox) {
+        expect(n.complaintId, id);
+      }
+
+      // The whole electrician department hears about the new work and the
+      // verified repair; another department hears nothing.
+      for (final AppUser u in <AppUser>[
+        worker,
+        w.staff(Department.electrician, 2),
+      ]) {
+        expect(
+          (await inbox(w, u)).map((AppNotification n) => n.title).toSet(),
+          <String>{'New work assigned', 'Repair verified'},
+          reason: u.id,
+        );
+      }
+      expect(await inbox(w, w.staff(Department.plumber)), isEmpty);
+
+      // The verifier(s) and the admin heard about the completed repair.
+      expect(
+        (await inbox(w, w.verifier)).map((AppNotification n) => n.title),
+        contains('Ready to verify'),
+      );
+      expect(
+        (await inbox(w, w.admin)).map((AppNotification n) => n.title).toSet(),
+        <String>{'New complaint', 'Ready to verify'},
+      );
+
+      // Closing is the owner's last message.
+      final Complaint verified = await w.read(w.admin, id);
+      await w.ok(w.admin, () => w.service.close(verified, w.admin, now: at(6)));
+      expect(
+        (await inbox(w, w.reporter)).map((AppNotification n) => n.title),
+        contains('Complaint closed'),
+      );
+    });
+
+    test('a writer who cannot read private/identity still addresses the '
+        'owner (reporterId in private/admin)', () async {
+      final _World w = _World();
+      final Complaint filed = await w.submit();
+      // The assembled complaint of a verifier carries a blank reporter.
+      final Complaint seen = await w.read(w.verifier, filed.id);
+      expect(seen.reporter.userId, isEmpty);
+
+      await w.ok(
+        w.verifier,
+        () => w.service.reviewAndRoute(seen, w.verifier, now: at(1)),
+      );
+      expect(
+        (await inbox(w, w.reporter)).map((AppNotification n) => n.title),
+        containsAll(<String>['Complaint reviewed', 'Complaint assigned']),
+      );
     });
 
     test('(positive control) the stock NotificationService reads the '

@@ -227,12 +227,16 @@ class ComplaintService {
       updatedAt: at,
     );
 
+    // Persist first, then notify from the *persisted* complaint: a repository
+    // may re-key the draft (the Firebase one replaces the local id with the
+    // counter-allocated Complaint ID, and the TL-1 event id with it), and the
+    // notification ids / complaintId must carry the stored values.
+    final saved = await _complaints.submit(draft);
     final notifications = await _notifier.buildFor(
       null,
-      draft,
-      draft.timeline.first,
+      saved,
+      saved.timeline.first,
     );
-    final saved = await _complaints.submit(draft);
     await _notifier.deliver(notifications);
     return saved;
   }

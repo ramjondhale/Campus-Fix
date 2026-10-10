@@ -133,6 +133,38 @@ Implemented in `packages/campusfix_firebase` (`firebase_complaint_repository.dar
   C3, and a staff-id roster), build the notifications **after** `submit` returns (the repository
   replaces the draft's Complaint ID), and delete the override.
 
+## C4 notes (in-app notifications)
+
+Implemented in `packages/campusfix_firebase` (`firebase_notification_service.dart`,
+`complaint_writes.dart`), core's `ComplaintService.submit`, `backend/firestore.rules` and
+`backend/seed/seed.mjs`. `DeferredNotificationService` (C3) is deleted.
+
+- **Producer.** `FirebaseNotificationService extends NotificationService` is injected through
+  `notificationServiceProvider` in both apps' `firebase_overrides.dart`. It keeps core's templates, the
+  one-message-per-person rule and the `ntf-<eventId>-<recipientId>` ids; only recipient resolution (and
+  re-delivery) changes. It never reads `users/` or `private/identity`.
+- **Recipients, all non-PII.** *Owner* = `after.reporter.userId` when set (submit), else
+  `complaints/{id}/private/admin.reporterId` (one `get`, cached per complaint). *department / verifiers /
+  admins* = `rosters/staff` (read once per service instance):
+  `{ maintenance: { <Department.name>: [uid] }, verifiers: [uid], admins: [uid] }`; "verifiers" =
+  `verifiers` + `admins`. An audience that cannot be resolved is skipped (never an empty `recipientId`,
+  which the rule rejects) and a failed lookup is logged, not thrown, so a notification problem cannot
+  fail the complaint write.
+- **`reporterId`** is the reporter's opaque uid in `private/admin` (seven keys now). Written at submit,
+  carried over on every update from the stored document, and enforced by the rules: required string,
+  `== request.auth.uid` on create, immutable on update. Name / ID / e-mail / phone stay in
+  `private/identity`. A `private/admin` from before C4 has no `reporterId`: re-run the seed (an update of
+  such a document is refused with a `StateError`, and by the rules).
+- **Ordering fix.** `ComplaintService.submit` now builds and delivers the submission notifications
+  *after* `ComplaintRepository.submit` returns, from the persisted complaint, because the Firebase
+  repository replaces the draft's Complaint ID (and the TL-1 event id) with the counter-allocated one.
+  Transitions already notify from the re-read complaint; their ids never change.
+- **Duplicates.** Re-writing an existing deterministic notification id is `permission-denied` (the
+  recipient may only flip `read`) and the writer cannot read it to check, so `deliver` treats that code as
+  an idempotent re-delivery and rethrows any other error.
+- **Rules.** `rosters/{doc}`: `get, list` for any signed-in user, `write: false` (the seed writes it with
+  the Admin SDK). `notifications` rule unchanged. Re-seed and re-deploy the rules together.
+
 ## Orchestration
 Opus orchestrator plans/decides/verifies; Sonnet agents implement each chunk (own worktree/branch);
 orchestrator merges, builds/verifies, checkpoints. Account-free chunks (C0) run now while the Firebase

@@ -33,7 +33,8 @@ backend/
 
 Reads and identity privacy are rules-enforced from day one (the one read relaxation is `private/admin`, see
 above); the MVP trusts the client for write *integrity* (e.g. the priority value). In-app notifications are
-**not produced yet** (C3 swaps in a no-op producer; C4 adds the fan-out). Do not point real college data at
+produced client-side (C4: `FirebaseNotificationService` addresses them from the non-PII
+`private/admin.reporterId` and `rosters/staff`; no push). Do not point real college data at
 this configuration.
 
 ## Prerequisites

@@ -73,6 +73,27 @@ void expectInvariants(Complaint c) {
   }
 }
 
+/// A repository that stores the draft under a different id, like the Firebase
+/// one (the Complaint ID comes from a server-side counter).
+class _RekeyingComplaintRepository extends MockComplaintRepository {
+  _RekeyingComplaintRepository(this.newId);
+
+  final String newId;
+
+  @override
+  Future<Complaint> submit(Complaint draft) => super.submit(
+    draft.copyWith(
+      id: newId,
+      timeline: [
+        for (var i = 0; i < draft.timeline.length; i++)
+          draft.timeline[i].copyWith(
+            id: 'ev-$newId-${(i + 1).toString().padLeft(2, '0')}',
+          ),
+      ],
+    ),
+  );
+}
+
 void main() {
   late Harness h;
   setUp(() => h = Harness());
@@ -199,6 +220,47 @@ void main() {
         }
       },
     );
+
+    test('builds the submission notifications from the persisted complaint '
+        '(a repository that re-keys the draft)', () async {
+      // The Firebase repository replaces the local id (and the TL-1 event id)
+      // with the counter-allocated Complaint ID inside `submit`: the
+      // notifications must carry the stored id, not the draft's.
+      final service = ComplaintService(
+        complaints: _RekeyingComplaintRepository('CF-2026-00777'),
+        notifications: h.notifications,
+        users: h.users,
+        ids: ComplaintIdGenerator(),
+        clock: () => t0,
+      );
+
+      final saved = await service.submit(
+        reporter: h.identityOf(h.reporterUser),
+        category: ProblemCategory.electrical,
+        description: 'The problem is clearly visible near the entrance.',
+        building: 'Science Block',
+        floor: '2',
+        room: 'Lab 204',
+        severity: Severity.moderate,
+        peopleAffected: PeopleAffected.small,
+        now: t0,
+      );
+
+      expect(saved.id, 'CF-2026-00777');
+      expect(saved.timeline.single.id, 'ev-CF-2026-00777-01');
+      final all = await h.allNotifications();
+      expect(all, hasLength(2));
+      for (final n in all) {
+        expect(n.complaintId, 'CF-2026-00777');
+        expect(n.id, startsWith('ntf-ev-CF-2026-00777-01-'));
+        expect(n.body, contains('CF-2026-00777'));
+        expect(n.body, isNot(contains('CF-2026-00001')));
+      }
+      expect(
+        {for (final n in all) n.recipientId},
+        {h.reporterUser.id, h.admin.id},
+      );
+    });
 
     test('rejects blank text and non-before photos; stores nothing', () async {
       Future<void> bad({String description = 'ok text', String room = 'R1'}) =>

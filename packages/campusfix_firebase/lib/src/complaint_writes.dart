@@ -65,15 +65,26 @@ Complaint withAllocatedId(Complaint draft, String id) => draft.copyWith(
 );
 
 /// `private/admin` of [c] (plan section 5.2): priority inputs, the full
-/// assignment and the actor-bearing timeline, dates as Firestore `Timestamp`s.
-Map<String, Object?> adminDocFor(Complaint c) =>
+/// assignment and the actor-bearing timeline, dates as Firestore `Timestamp`s,
+/// plus [reporterId].
+///
+/// **[reporterId]** is the reporter's opaque uid and nothing else (never the
+/// name, ID number, e-mail or phone, which stay in `private/identity`). It lets
+/// the writing client address the *owner* notification without reading the
+/// admin-only identity document (chunk C4); `private/admin` is readable by every
+/// signed-in user since C3. It is set at submit and carried over unchanged on
+/// every update (the rules make it immutable). The app never shows it.
+Map<String, Object?> adminDocFor(Complaint c, {required String reporterId}) =>
     jsonToFirestore(<String, Object?>{
+          'reporterId': reporterId,
           'priority': c.priority.name,
           'priorityOverride': c.priorityOverride?.name,
           'severity': c.severity.name,
           'peopleAffected': c.peopleAffected.name,
           'assignment': c.assignment?.toJson(),
-          'timeline': <Object?>[for (final StatusEvent e in c.timeline) e.toJson()],
+          'timeline': <Object?>[
+            for (final StatusEvent e in c.timeline) e.toJson(),
+          ],
         })!
         as Map<String, Object?>;
 
@@ -112,7 +123,7 @@ NewComplaintDocs newComplaintDocs(Complaint c) {
   };
   return NewComplaintDocs(
     publicDoc: jsonToFirestore(publicJson)! as Map<String, Object?>,
-    adminDoc: adminDocFor(c),
+    adminDoc: adminDocFor(c, reporterId: c.reporter.userId),
     identityDoc: <String, Object?>{...c.reporter.toJson()},
     ownedDoc:
         jsonToFirestore(<String, Object?>{
@@ -144,7 +155,8 @@ class ComplaintUpdatePlan {
   /// holds by construction.
   final Map<String, Object?> publicFields;
 
-  /// Fields to `update` on `complaints/{id}/private/admin` (all six keys).
+  /// Fields to `update` on `complaints/{id}/private/admin` (all seven keys,
+  /// `reporterId` carried over from the stored document).
   final Map<String, Object?> adminFields;
 
   /// The assignee whose `staffClaims/{uid}/items/{id}` marker must be deleted
@@ -176,6 +188,12 @@ class ComplaintUpdatePlan {
 /// **Claim markers.** The old assignee comes from the stored `private/admin`,
 /// the new one from [next]; [ComplaintUpdatePlan.releaseClaimOf] /
 /// [ComplaintUpdatePlan.takeClaimFor] are set only when they differ.
+///
+/// **`reporterId`.** [next] is assembled for the acting user, so its
+/// `reporter.userId` is `''` unless the actor is the reporter; the uid written
+/// back to `private/admin` is the stored one (falling back to [next]'s when the
+/// stored document predates the field). Throws a [StateError] when neither
+/// names a reporter: writing `''` would break the owner notification.
 ///
 /// Throws a [ComplaintConflictException] when the stored version differs, the
 /// complaint is `closed` (INV-4), or [next]'s timeline does not extend the
@@ -233,6 +251,18 @@ ComplaintUpdatePlan planComplaintUpdate({
       ),
   ];
 
+  final Object? storedReporterId = storedAdmin?['reporterId'];
+  final String reporterId =
+      storedReporterId is String && storedReporterId.isNotEmpty
+      ? storedReporterId
+      : next.reporter.userId;
+  if (reporterId.isEmpty) {
+    throw StateError(
+      'private/admin of ${next.id} has no reporterId (a document from before '
+      'chunk C4): re-run the seed.',
+    );
+  }
+
   final int version = expectedVersion + 1;
   final String? assignee = next.assignment?.assigneeId;
   final Object? rawAssignment = storedAdmin?['assignment'];
@@ -256,7 +286,7 @@ ComplaintUpdatePlan planComplaintUpdate({
       'version': version,
       'claimed': assignee != null,
     },
-    adminFields: adminDocFor(next),
+    adminFields: adminDocFor(next, reporterId: reporterId),
     releaseClaimOf: previousAssignee != null && previousAssignee != assignee
         ? previousAssignee
         : null,

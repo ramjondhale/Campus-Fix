@@ -38,10 +38,13 @@
  * Firestore layout written (docs/phase-2-firebase-plan.md section 5, MVP):
  *   users/{uid}                                  profile (role/department also set as custom CLAIMS)
  *   complaints/{id}                              PUBLIC doc  = seed `public` + { version: 1, claimed }
- *   complaints/{id}/private/admin                seed `admin`
+ *   complaints/{id}/private/admin                seed `admin` + { reporterId } (the reporter's opaque uid; NO PII)
  *   complaints/{id}/private/identity             seed `identity`
  *   userComplaints/{reporterUid}/items/{id}      ownership index
  *   staffClaims/{assigneeUid}/items/{id}         claim index (only when an assignee is named)
+ *   rosters/staff                                non-PII staff uids for the client-side notification fan-out:
+ *                                                { maintenance: { <department>: [uid] }, verifiers: [uid], admins: [uid] }
+ *                                                (department keys = Department.name, e.g. "itTeam"; uids only, no names)
  *   notifications/{id}                           seed notifications (ids already ntf-<eventId>-<recipientId>)
  *   counters/complaintIds-{year}                 { last } from lastSequenceByYear
  *
@@ -145,6 +148,32 @@ function validateSeed(seed) {
 }
 
 /**
+ * `rosters/staff`: the staff uids per audience, for the client-side notification
+ * fan-out (chunk C4). Non-PII by construction: uids grouped by role / department,
+ * never a name or e-mail. Consumed by `FirebaseNotificationService`
+ * (packages/campusfix_firebase/lib/src/firebase_notification_service.dart) -
+ * keep both in sync:
+ *
+ *   maintenance[<Department.name>]  maintenance uids of that department
+ *   verifiers                       verifier uids only (the client adds `admins` for the
+ *                                   "verifiers" audience = every verifier and admin)
+ *   admins                          admin uids
+ */
+function buildStaffRoster(users) {
+  const roster = { maintenance: {}, verifiers: [], admins: [] };
+  for (const u of users) {
+    if (u.role === 'maintenance' && u.department) {
+      (roster.maintenance[u.department] ??= []).push(u.id);
+    } else if (u.role === 'verifier') {
+      roster.verifiers.push(u.id);
+    } else if (u.role === 'admin') {
+      roster.admins.push(u.id);
+    }
+  }
+  return roster;
+}
+
+/**
  * Turns the seed into the exact writes to perform. Pure: no network.
  * [toTimestamp] converts an ISO string to a Firestore Timestamp (stubbed in --dry-run).
  */
@@ -192,7 +221,12 @@ function buildPlan(seed, toTimestamp) {
       // `version` starts at 1; `claimed` mirrors "an assignee is named" (rule P7 helper).
       data: revive({ ...c.public, version: 1, claimed: assigneeId !== null }),
     });
-    docs.push({ path: `complaints/${c.id}/private/admin`, data: revive(c.admin) });
+    // `reporterId` = the reporter's opaque uid (the owner-notification address; NOT PII - the
+    // name / ID number / e-mail / phone stay in private/identity).
+    docs.push({
+      path: `complaints/${c.id}/private/admin`,
+      data: revive({ ...c.admin, reporterId: c.identity.userId }),
+    });
     docs.push({ path: `complaints/${c.id}/private/identity`, data: c.identity });
     docs.push({
       path: `userComplaints/${c.identity.userId}/items/${c.id}`,
@@ -205,6 +239,8 @@ function buildPlan(seed, toTimestamp) {
       });
     }
   }
+
+  docs.push({ path: 'rosters/staff', data: buildStaffRoster(seed.users) });
 
   for (const n of seed.notifications) {
     // The doc keeps its own `id` (the rules require it on create).
@@ -338,6 +374,11 @@ async function main() {
   if (DRY_RUN) {
     const sample = plan.authUsers[0];
     console.log(`(dry run) first user: uid=${sample?.uid} email=${sample?.email} claims=${JSON.stringify(sample?.claims)}`);
+    const roster = plan.docs.find((d) => d.path === 'rosters/staff')?.data;
+    const perDept = Object.entries(roster?.maintenance ?? {}).map(([d, ids]) => `${d}=${ids.length}`).join(' ');
+    console.log(
+      `(dry run) rosters/staff: maintenance{${perDept}} verifiers=${roster?.verifiers.length} admins=${roster?.admins.length}`,
+    );
     console.log('(dry run) nothing written.');
     return;
   }

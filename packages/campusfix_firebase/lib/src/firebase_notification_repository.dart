@@ -17,8 +17,9 @@ import 'firestore_codec.dart';
 /// Firestore `Timestamp`. The `(recipientId, createdAt desc)` composite index
 /// in `firestore.indexes.json` serves [byRecipient] / [watchByRecipient].
 ///
-/// Reads and `markRead` / `markAllRead` are implemented; the producer side
-/// (recipient resolution, idempotency policy) is TODO(C4).
+/// This class is the storage half only. Who a notification is addressed to is
+/// resolved by `FirebaseNotificationService` (chunk C4), which also owns the
+/// idempotency policy for [add].
 class FirebaseNotificationRepository implements NotificationRepository {
   FirebaseNotificationRepository(CampusFixFirebase fb)
     : _col = fb.firestore.collection('notifications');
@@ -68,9 +69,9 @@ class FirebaseNotificationRepository implements NotificationRepository {
   /// only change `read`), which surfaces as a `permission-denied`
   /// `FirebaseException`.
   ///
-  /// TODO(C4): decide the duplicate policy (treat `permission-denied` on an
-  /// existing deterministic id as success), and recipient resolution for
-  /// non-admin writers (see the chunk report).
+  /// Duplicate policy (C4): `FirebaseNotificationService.deliver` catches that
+  /// `permission-denied` and treats it as an idempotent re-delivery; this method
+  /// itself stays a plain `set` and rethrows.
   @override
   Future<AppNotification> add(AppNotification notification) async {
     await _col

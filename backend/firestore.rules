@@ -42,18 +42,19 @@ rules_version = '2';
 //       board's public document is unchanged). private/identity stays
 //       ADMIN-ONLY: the reporter's name / ID / e-mail / phone are NOT exposed.
 //                                             prod: admin only (server executor).
+//   (g) C4 notification fan-out recipients, both NON-PII: private/admin also
+//       carries `reporterId` (the reporter's opaque uid; set at submit,
+//       immutable afterwards), and `rosters/staff` lists staff uids by role /
+//       department (signed-in read, seed-written). The writing client uses them
+//       to address notifications without reading users/ (admin-only) or
+//       private/identity (admin-only). Neither holds a name, ID number, e-mail
+//       or phone.                              prod: the server resolves recipients.
 //
 // HONEST TRADEOFF: the MVP trusts the client for write INTEGRITY (e.g. the
 // priority value, the content of private/admin). Reads, identity privacy, the
 // transition matrix, and admin-only close ARE rules-enforced.
 //
-// OPEN (decide in C4 - see the chunk report):
-//   * Client-side notification fan-out needs staff ids (users/ is admin-only
-//     below) and the reporter's user id (a maintenance / verifier client cannot
-//     read private/identity). C3 ships WITHOUT notifications (the apps swap in
-//     a no-op producer); C4 must either relax users/ or add a non-PII
-//     recipients doc (e.g. a reporterId on private/admin, now readable by every
-//     signed-in user, plus a staff-id roster).
+// OPEN:
 //   * Admin `all()` over private/admin needs one get() per complaint (there is
 //     no list rule on private/admin); a collection-group rule would also expose
 //     private/identity, so it is intentionally not added here.
@@ -212,10 +213,19 @@ service cloud.firestore {
     // reads it first, MVP delta (f), and writes the whole document back with the
     // appended event). MVP trusts the content; the key set and timeline length
     // are checked. prod: server only.
+    //
+    // `reporterId` (MVP delta (g)) is the reporter's opaque uid, the only link the
+    // notification fan-out needs to address the owner; it is NOT PII (the name /
+    // ID number / e-mail / phone stay in private/identity). Required, a string,
+    // and (see `match /private/admin`) bound to the submitter on create and
+    // immutable on update.
     function validPrivateAdmin(id) {
       let d = request.resource.data;
       return d.keys().hasOnly(['priority', 'priorityOverride', 'severity', 'peopleAffected',
-                               'assignment', 'timeline'])
+                               'assignment', 'timeline', 'reporterId'])
+          && d.keys().hasAll(['priority', 'priorityOverride', 'severity', 'peopleAffected',
+                              'assignment', 'timeline', 'reporterId'])
+          && d.reporterId is string && d.reporterId.size() > 0
           && d.timeline.size() == complaintAfter(id).timeline.size();
     }
 
@@ -235,9 +245,11 @@ service cloud.firestore {
       match /private/admin {
         allow get:    if signedIn();
         allow create: if signedIn() && complaintCreatedInThisWrite(complaintId)
-                      && validPrivateAdmin(complaintId);
+                      && validPrivateAdmin(complaintId)
+                      && request.resource.data.reporterId == request.auth.uid;
         allow update: if signedIn() && complaintVersionBumpedInThisWrite(complaintId)
-                      && validPrivateAdmin(complaintId);
+                      && validPrivateAdmin(complaintId)
+                      && request.resource.data.reporterId == resource.data.reporterId;
         allow delete: if false;
       }
 
@@ -269,6 +281,17 @@ service cloud.firestore {
       allow create, delete: if signedIn() && (request.auth.uid == uid || isAdmin())
                             && complaintVersionBumpedInThisWrite(complaintId);
       allow update: if false;
+    }
+
+    // ---- staff roster: non-PII recipient ids for the notification fan-out --------
+    // rosters/staff = { maintenance: { <department>: [uid, ...] }, verifiers: [uid, ...],
+    // admins: [uid, ...] }: uids only, no names / e-mails. MVP delta (g): written by the
+    // seed (Admin SDK bypasses rules), read by every signed-in client so a writing
+    // reporter / maintenance / verifier can address staff notifications without the
+    // admin-only users/ directory. prod: the server resolves recipients.
+    match /rosters/{doc} {
+      allow get, list: if signedIn();
+      allow write:     if false;
     }
 
     // ---- notifications: in-app feed only (no FCM in the MVP) --------------------
