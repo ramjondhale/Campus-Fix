@@ -31,6 +31,38 @@ const int kAuthEmulatorPort = 9099;
 const int kFirestoreEmulatorPort = 8080;
 const int kStorageEmulatorPort = 9199;
 
+// Real-project Firebase web config, supplied at build time via --dart-define so
+// no config file is committed and the repo stays config-free (web API keys are
+// public identifiers, not secrets — security is enforced by the Security Rules).
+// Get the values from `firebase apps:sdkconfig WEB <appId>`.
+const String _cfApiKey = String.fromEnvironment('CF_API_KEY');
+const String _cfAppId = String.fromEnvironment('CF_APP_ID');
+const String _cfProjectId = String.fromEnvironment('CF_PROJECT_ID');
+const String _cfMessagingSenderId = String.fromEnvironment(
+  'CF_MESSAGING_SENDER_ID',
+);
+const String _cfAuthDomain = String.fromEnvironment('CF_AUTH_DOMAIN');
+const String _cfStorageBucket = String.fromEnvironment('CF_STORAGE_BUCKET');
+
+/// Builds [FirebaseOptions] from the `CF_*` dart-defines, or null when the
+/// required ones are absent (e.g. an emulator build that passes none).
+FirebaseOptions? _optionsFromDefines() {
+  if (_cfApiKey.isEmpty ||
+      _cfAppId.isEmpty ||
+      _cfProjectId.isEmpty ||
+      _cfMessagingSenderId.isEmpty) {
+    return null;
+  }
+  return FirebaseOptions(
+    apiKey: _cfApiKey,
+    appId: _cfAppId,
+    projectId: _cfProjectId,
+    messagingSenderId: _cfMessagingSenderId,
+    authDomain: _cfAuthDomain.isEmpty ? null : _cfAuthDomain,
+    storageBucket: _cfStorageBucket.isEmpty ? null : _cfStorageBucket,
+  );
+}
+
 /// Placeholder options used only in emulator mode when the caller passes none:
 /// a `demo-*` project id never touches a real Firebase project, so the emulator
 /// flow needs no `firebase_options.dart` and no `google-services.json`.
@@ -81,12 +113,16 @@ class CampusFixFirebase {
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
 
+    // Precedence: an explicitly passed `options`, then the CF_* dart-defines,
+    // then (emulator only) the demo placeholder. A real web build must resolve
+    // to non-null options (web has no google-services.json).
+    final FirebaseOptions? resolvedOptions =
+        options ?? _optionsFromDefines() ?? (kCfUseEmulator ? _emulatorDemoOptions : null);
+
     // On an Android hot restart the native app survives, so reuse it.
     final FirebaseApp app = Firebase.apps.isNotEmpty
         ? Firebase.app()
-        : await Firebase.initializeApp(
-            options: options ?? (kCfUseEmulator ? _emulatorDemoOptions : null),
-          );
+        : await Firebase.initializeApp(options: resolvedOptions);
 
     final FirebaseFirestore firestore = FirebaseFirestore.instanceFor(app: app);
     final FirebaseAuth auth = FirebaseAuth.instanceFor(app: app);

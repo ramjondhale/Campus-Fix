@@ -8,6 +8,9 @@ seed/seed.json
 service-account*.json
 *.pem
 
+# Hosting deploy staging dir (copy of apps/admin/build/web; rebuilt per deploy)
+public/
+
 # Firebase CLI / emulator output
 .firebase/
 firebase-debug.log

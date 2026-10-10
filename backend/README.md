@@ -8,7 +8,9 @@ Plan and decisions: [`docs/phase-2-mvp.md`](../docs/phase-2-mvp.md) (MVP deltas)
 ```
 backend/
   firebase.json            emulators (auth 9099, firestore 8080, storage 9199, hosting 5000, ui 4000),
-                           hosting -> ../apps/admin/build/web (SPA rewrite), rules + indexes. No "functions".
+                           hosting -> public/ (gitignored staging copy of ../apps/admin/build/web; SPA
+                           rewrite — Firebase forbids a public dir outside backend/), rules + indexes.
+                           No "functions".
   .firebaserc              project aliases (REPLACE_WITH_DEV_PROJECT_ID until the dev project exists)
   firestore.rules          3-way document split; reads production-grade; MVP client writes gated by the
                            status-transition mirror. Header comment lists every MVP-vs-prod delta.
@@ -97,20 +99,51 @@ the quick-fill ids/password match the seed).
 
 ## Dev project (personal Spark project)
 
+Live dev project: **`campus-fix-a8e09`** — Hosting **https://campus-fix-a8e09.web.app**.
+
 Owner-only console steps (~5 min): create the project, enable **Email/Password** sign-in, create the
-**Firestore** database, and generate a **service-account key**. Then set the project id in `.firebaserc`
-(`default` and `dev`) and deploy:
+**Firestore** database, generate a **service-account key** (saved at `~/.campusfix-firebase/dev-sa.json`,
+`chmod 600`), and grant that service account the **Editor** role in Google Cloud IAM. The default
+"Firebase Admin SDK" SA can do runtime data + Auth + (via Admin SDK) rules, but **not** CLI deploys, index
+creation, app registration, or Hosting without a management role.
+
+All CLI/SDK steps use the key + an isolated CLI config so the work Firebase login is untouched:
 
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS=$HOME/.campusfix/dev-sa-key.json
-export XDG_CONFIG_HOME=$HOME/.campusfix-firebase           # isolate from the work login
+export GOOGLE_APPLICATION_CREDENTIALS=$HOME/.campusfix-firebase/dev-sa.json
+export XDG_CONFIG_HOME=$HOME/.campusfix-firebase/fbconfig     # isolate from the work login
+PROJECT=campus-fix-a8e09
+```
 
-# rules + indexes (+ storage rules once the Storage bucket exists)
-cd backend && firebase deploy --only firestore:rules,firestore:indexes --project dev
+**Seed** (Auth users + claims + Firestore data — Admin SDK, bypasses rules):
+```bash
+cd packages/campusfix_core && dart run tool/export_seed.dart --deterministic > ../../backend/seed/seed.json
+cd ../../backend/seed && npm install && ALIAS_DOMAIN=id.campusfix.test node seed.mjs --yes
+```
 
-# admin web -> Firebase Hosting (free)
-cd apps/admin && flutter build web -t lib/main_firebase.dart --dart-define=CF_ENV=dev
-cd ../../backend && firebase deploy --only hosting --project dev
+**Rules** — the CLI's rules *test* step needs a permission the SA lacks (`firebaserules:test` 403), so
+deploy rules via the Admin SDK (this also validates syntax):
+```bash
+cd backend/seed && node --input-type=module -e "import admin from 'firebase-admin';import {readFile} from 'node:fs/promises';admin.initializeApp({credential:admin.credential.applicationDefault()});await admin.securityRules().releaseFirestoreRulesetFromSource(await readFile('../firestore.rules','utf8'));console.log('rules released');"
+```
+
+**Indexes** (CLI, needs the Editor role):
+```bash
+cd backend && firebase deploy --only firestore:indexes --project $PROJECT
+```
+
+**Admin web → Firebase Hosting** (free). The web build needs the Firebase config as dart-defines (from
+`firebase apps:sdkconfig WEB <appId>`), and the Hosting public dir must live inside `backend/`, so stage the
+build into `backend/public/` first:
+```bash
+cd apps/admin && flutter build web -t lib/main_firebase.dart \
+  --dart-define=CF_ENV=dev --dart-define=CF_ALIAS_DOMAIN=id.campusfix.test \
+  --dart-define=CF_API_KEY=<apiKey> --dart-define=CF_APP_ID=<appId> --dart-define=CF_PROJECT_ID=$PROJECT \
+  --dart-define=CF_MESSAGING_SENDER_ID=<senderId> \
+  --dart-define=CF_AUTH_DOMAIN=$PROJECT.firebaseapp.com \
+  --dart-define=CF_STORAGE_BUCKET=$PROJECT.firebasestorage.app
+cd ../../backend && rsync -a --delete ../apps/admin/build/web/ public/ \
+  && firebase deploy --only hosting --project $PROJECT
 ```
 
 Enable email-enumeration protection in Auth settings (plan section 4) so unknown-user and wrong-password
