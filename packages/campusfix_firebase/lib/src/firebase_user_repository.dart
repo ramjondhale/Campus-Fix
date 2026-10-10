@@ -27,7 +27,9 @@ import 'firestore_codec.dart';
 /// TODO(C1): verify against the emulator once the seed has written `users/*`.
 /// TODO(C4): non-admin clients cannot list users under these rules, but core's
 /// client-side `NotificationService.buildFor` calls [all] to resolve recipients.
-/// Decide how recipients are resolved (see the chunk report) before C3/C4.
+/// C3 keeps writes working by swapping in `DeferredNotificationService` (its
+/// `buildFor` produces nothing, so [all] is never called on the write path);
+/// C4 must decide how recipients are resolved (see that class) and remove it.
 class FirebaseUserRepository implements UserRepository {
   FirebaseUserRepository(CampusFixFirebase fb)
     : _users = fb.firestore.collection('users');

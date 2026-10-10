@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'campus_fix_firebase.dart';
+import 'complaint_writes.dart';
 import 'firebase_auth_repository.dart';
 import 'firestore_codec.dart';
 
@@ -20,13 +21,13 @@ const String kClaimedByColleagueId = '__claimed__';
 /// [publicDoc] is `complaints/{id}` (the 17 `PublicComplaintView` keys plus
 /// `version` and `claimed`); [adminDoc] is `complaints/{id}/private/admin` and
 /// is only honoured when [viewer] is an admin (a defense in depth: callers pass
-/// it for admins only). Both must already be passed through `documentToJson`
-/// (Timestamps converted to ISO strings).
+/// it for admins only) **or** [trustAdminDoc] is set. Both must already be
+/// passed through `documentToJson` (Timestamps converted to ISO strings).
 ///
 /// Restricted fields are filled with inert placeholders so the providers stay
 /// untouched:
 ///
-/// | field | admin | other viewers |
+/// | field | admin / [trustAdminDoc] | other viewers |
 /// |---|---|---|
 /// | `reporter` | placeholder, `userId` = viewer id only when [ownedByViewer] | same |
 /// | `assignment.assigneeId` | real (from [adminDoc]) | maintenance: viewer id if [claimedByViewer], [kClaimedByColleagueId] if `claimed`, else null; others: null |
@@ -34,20 +35,27 @@ const String kClaimedByColleagueId = '__claimed__';
 /// | `timeline[].actorId` / `id` | real | empty / derived (`ev-<id>-NN`) |
 /// | `priority`, `priorityOverride`, `severity`, `peopleAffected` | real | `priority = effectivePriority`, override null, inert defaults |
 ///
+/// **[trustAdminDoc]** is for the write path only ([FirebaseComplaintRepository.byId]):
+/// the MVP rules let every signed-in user read `private/admin` (rules delta
+/// (f)), and `ComplaintService` must validate and recompute against the *real*
+/// priority inputs, assignment and timeline whoever acts. Computing a priority
+/// from the placeholders (`severity = minor`, `peopleAffected = individual`)
+/// would silently lower it. The board / list reads never set it.
+///
 /// The real reporter identity is never assembled here: an admin gets it only
-/// through the audited reveal (`private/identity`, TODO(C3)).
+/// through the audited reveal (`FirebaseReporterIdentityRevealer`, plan S-5).
 Complaint assembleComplaint({
   required Map<String, Object?> publicDoc,
   Map<String, Object?>? adminDoc,
   required AppUser viewer,
   bool ownedByViewer = false,
   bool claimedByViewer = false,
+  bool trustAdminDoc = false,
 }) {
   final PublicComplaintView pub = PublicComplaintView.fromJson(publicDoc);
   final bool claimed = publicDoc['claimed'] == true;
-  final Map<String, Object?>? admin = viewer.role.canSeeReporterIdentity
-      ? adminDoc
-      : null;
+  final Map<String, Object?>? admin =
+      (viewer.role.canSeeReporterIdentity || trustAdminDoc) ? adminDoc : null;
 
   final Priority priority;
   final Priority? priorityOverride;
@@ -171,7 +179,7 @@ String? _placeholderAssigneeId(
 ///
 /// `private/identity` is **never** read here: the assembled `reporter` is always
 /// a placeholder (an admin gets the real identity only through the audited
-/// reveal, TODO(C3)).
+/// reveal, `FirebaseReporterIdentityRevealer`).
 ///
 /// **Not bounded yet.** Plan S-11 / R1 asks for bounded listeners (open
 /// complaints plus recent closed). The MVP demo board is the whole seed (29
@@ -182,7 +190,26 @@ String? _placeholderAssigneeId(
 /// A document that cannot be decoded (a malformed or hand-edited document) is
 /// skipped with a `debugPrint` rather than failing the whole board.
 ///
-/// The write methods ([submit], [update]) are still C3 stubs.
+/// ## Writes (C3: client-side, no Cloud Functions)
+///
+/// `ComplaintService` runs in the client for every role and calls [submit] /
+/// [update]; each is **one Firestore transaction** whose documents the rules
+/// validate as a batch (`firestore.rules`: `validNewComplaint`, `validUpdate`,
+/// `validPrivateAdmin`, the index and `counters` rules). The pure planning half
+/// lives in `complaint_writes.dart`.
+///
+/// | call | transaction |
+/// |---|---|
+/// | [submit] | read `counters/complaintIds-{year}`, allocate `CF-{year}-{NNNNN}` (create at 1 or +1), then write `complaints/{id}` (version 1, claimed false), `private/admin`, `private/identity` and `userComplaints/{uid}/items/{id}` |
+/// | [update] | read the public + `private/admin` documents, check `version` against the last [byId] read, then update both (`version + 1`, appended timeline, new `updatedAt`) and add / remove the `staffClaims` marker of a changed assignee |
+///
+/// **[byId] is the write base.** Every `ComplaintService` action starts with
+/// `byId`. Unlike the list reads it fetches `private/admin` for **every** role
+/// (MVP rules delta (f): any signed-in user may read it) and assembles the
+/// *real* priority inputs, assignment and timeline, so the service recomputes
+/// priorities and validates P6 / P7 against true data whoever acts. It also
+/// remembers the `version` it saw; [update] writes only if the stored version
+/// still equals it (otherwise a [ComplaintConflictException]).
 class FirebaseComplaintRepository implements ComplaintRepository {
   FirebaseComplaintRepository(
     CampusFixFirebase fb, {
@@ -193,11 +220,15 @@ class FirebaseComplaintRepository implements ComplaintRepository {
   final CampusFixFirebase _fb;
   final AuthRepository _viewer;
 
-  /// `version` of each complaint as last read (optimistic concurrency, rule
+  /// What the last [byId] of each complaint saw (optimistic concurrency, rule
   /// P8). `Complaint` has no version field, so the repository remembers it and
-  /// writes `version + 1` on [update]. Populated by every read in this file.
-  // TODO(C3): consumed by update().
-  final Map<String, int> _versions = <String, int>{};
+  /// writes `version + 1` on [update].
+  ///
+  /// Filled **only by [byId]**, not by the list / stream reads: those can run
+  /// between the service's read and its write and would silently re-base a
+  /// plan that was made on an older state (the P8 "expected status" check would
+  /// then be against the wrong snapshot). [update] consumes the entry.
+  final Map<String, _WriteBase> _bases = <String, _WriteBase>{};
 
   /// `private/admin` reads of the admin viewer, keyed by complaint id and valid
   /// while the public document's `version` + `updatedAt` are unchanged (the
@@ -241,30 +272,75 @@ class FirebaseComplaintRepository implements ComplaintRepository {
   Future<List<Complaint>> all() => _readQuery(_complaints);
 
   /// The complaint with [id], or `null` when it does not exist (or nobody is
-  /// signed in).
+  /// signed in): **the base of every write** (see the class documentation).
   ///
-  /// Reads: public `complaints/{id}` in parallel with a membership get on the
+  /// Reads, in parallel: public `complaints/{id}`, a fresh `private/admin` get
+  /// (**every role**, never from the cache, because `ComplaintService`
+  /// validates and recomputes against this copy) and a membership get on the
   /// viewer's own `userComplaints` (non-admin) / `staffClaims` (maintenance)
-  /// index; admin: plus a fresh `private/admin` get (never from the cache,
-  /// because `ComplaintService` validates transitions against this copy).
+  /// index. The complaint is assembled with the real admin half
+  /// (`trustAdminDoc`) and its `version` is remembered for [update].
+  ///
+  /// A non-admin whose `private/admin` read is `permission-denied` (a ruleset
+  /// from before the C3 relaxation) falls back to the placeholder assembly so
+  /// the screens keep reading; [update] then refuses to write (it would have to
+  /// guess the priority inputs). An admin's denial is rethrown: the token is
+  /// not an admin's.
   @override
   Future<Complaint?> byId(String id) async {
     final AppUser? viewer = _viewer.currentUser;
     if (viewer == null || !_isDocumentId(id)) return null;
 
-    final (doc, indexes) = await _both(
+    final List<Object?> reads = await Future.wait<Object?>(<Future<Object?>>[
       _complaints.doc(id).get(),
+      _readAdminForWrite(viewer, id),
       _membershipIndexes(viewer, id),
-    );
+    ]);
+    final DocumentSnapshot<Map<String, dynamic>> doc =
+        reads[0]! as DocumentSnapshot<Map<String, dynamic>>;
     if (!doc.exists) return null;
+    final Map<String, Object?>? adminJson = reads[1] as Map<String, Object?>?;
+    final _Indexes indexes = reads[2]! as _Indexes;
 
-    final List<Complaint> found = await _finish(
-      viewer,
-      <DocumentSnapshot<Map<String, dynamic>>>[doc],
-      indexes,
-      useCache: false,
-    );
-    return found.isEmpty ? null : found.first;
+    try {
+      final Complaint complaint = assembleComplaint(
+        publicDoc: documentToJson(doc.data(), id: doc.id),
+        adminDoc: adminJson,
+        viewer: viewer,
+        ownedByViewer: indexes.owned.contains(doc.id),
+        claimedByViewer: indexes.claimed.contains(doc.id),
+        trustAdminDoc: true,
+      );
+      final Object? version = doc.data()?['version'];
+      if (version is num) {
+        _bases[doc.id] = _WriteBase(
+          uid: viewer.id,
+          version: version.toInt(),
+          hasAdminDetail: adminJson != null,
+        );
+      }
+      return complaint;
+    } on Object catch (e) {
+      debugPrint('FirebaseComplaintRepository: skipped ${doc.id} ($e)');
+      return null;
+    }
+  }
+
+  /// `private/admin` of [complaintId] as JSON for the write base, or `null`
+  /// when it does not exist (or a non-admin is denied, see [byId]).
+  Future<Map<String, Object?>?> _readAdminForWrite(
+    AppUser viewer,
+    String complaintId,
+  ) async {
+    try {
+      final DocumentSnapshot<Map<String, dynamic>> snap = await _adminRef(
+        complaintId,
+      ).get();
+      return snap.exists ? documentToJson(snap.data()) : null;
+    } on FirebaseException catch (e) {
+      if (!_isAdmin(viewer) && e.code == 'permission-denied') return null;
+      rethrow;
+    }
   }
 
   /// Complaints filed by [userId].
@@ -493,7 +569,6 @@ class FirebaseComplaintRepository implements ComplaintRepository {
             claimedByViewer: indexes.claimed.contains(doc.id),
           ),
         );
-        _remember(doc);
       } on Object catch (e) {
         // One bad document must not take the whole board down.
         debugPrint('FirebaseComplaintRepository: skipped ${doc.id} ($e)');
@@ -502,41 +577,176 @@ class FirebaseComplaintRepository implements ComplaintRepository {
     return out;
   }
 
-  /// Remembers the public document's `version` for the C3 write path.
-  void _remember(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final Object? version = doc.data()?['version'];
-    if (version is num) _versions[doc.id] = version.toInt();
+  // ---------------------------------------------------------------------------
+  // Writes (C3)
+  // ---------------------------------------------------------------------------
+
+  /// Persists a new complaint prepared by `ComplaintService.submit` and returns
+  /// it **under its allocated Complaint ID** (seam S-3).
+  ///
+  /// One Firestore transaction:
+  ///
+  /// 1. read `counters/complaintIds-{year}` (year of `createdAt`) and take
+  ///    `last + 1` (the rule only allows creating the counter at 1 or
+  ///    incrementing it by exactly 1, capped at 99999);
+  /// 2. write the counter, `complaints/{id}` (the 17 public keys, `version: 1`,
+  ///    `claimed: false`), `private/admin`, `private/identity` (the submitting
+  ///    reporter) and `userComplaints/{uid}/items/{id}`.
+  ///
+  /// The draft's own ID (from the service's local `ComplaintIdGenerator`) is
+  /// ignored and replaced, including inside the TL-1 event id
+  /// ([withAllocatedId]); a Complaint-ID collision (the counter is behind the
+  /// data) aborts with a [StateError] instead of overwriting.
+  ///
+  /// Rules: `validNewComplaint` (id format, status `reported`, version 1,
+  /// timeline of one event by the caller's role, ownership marker in the same
+  /// batch), `complaintCreatedInThisWrite` for the three side documents, and
+  /// the `counters` rule. Needs a signed-in reporter whose uid is the draft's
+  /// `reporter.userId`.
+  @override
+  Future<Complaint> submit(Complaint draft) async {
+    final AppUser? viewer = _viewer.currentUser;
+    if (viewer == null) {
+      throw StateError('FirebaseComplaintRepository.submit: nobody is signed in.');
+    }
+    if (draft.reporter.userId != viewer.id) {
+      // The identity / ownership documents are keyed by the caller's uid.
+      throw ArgumentError('The reporter of a new complaint must be the signed-in user.');
+    }
+
+    final int year = draft.createdAt.year;
+    final DocumentReference<Map<String, dynamic>> counter = _fb.firestore
+        .collection('counters')
+        .doc(complaintCounterDocId(year));
+
+    return _fb.firestore.runTransaction<Complaint>((Transaction tx) async {
+      // A transaction's reads must all come before its writes, and the handler
+      // may run again on contention: it only derives values from what it read.
+      final DocumentSnapshot<Map<String, dynamic>> counterSnap = await tx.get(
+        counter,
+      );
+      final Object? rawLast = counterSnap.data()?['last'];
+      final int last = !counterSnap.exists
+          ? 0
+          : (rawLast is num ? rawLast.toInt() : -1);
+      if (last < 0) {
+        throw StateError('counters/${counter.id} is malformed.');
+      }
+      final int sequence = last + 1;
+      if (sequence > kMaxComplaintSequence) {
+        throw StateError('Complaint ID sequence exhausted for $year.');
+      }
+      final String id = complaintIdFor(year, sequence);
+      final DocumentReference<Map<String, dynamic>> publicRef = _complaints.doc(
+        id,
+      );
+      if ((await tx.get(publicRef)).exists) {
+        throw StateError(
+          'Complaint $id already exists: the ID counter is behind the data.',
+        );
+      }
+
+      final Complaint saved = withAllocatedId(draft, id);
+      final NewComplaintDocs docs = newComplaintDocs(saved);
+      if (counterSnap.exists) {
+        tx.update(counter, <String, Object?>{'last': sequence});
+      } else {
+        tx.set(counter, <String, Object?>{'last': sequence});
+      }
+      tx.set(publicRef, docs.publicDoc);
+      tx.set(publicRef.collection('private').doc('admin'), docs.adminDoc);
+      tx.set(publicRef.collection('private').doc('identity'), docs.identityDoc);
+      tx.set(_ownedIndex(viewer.id).doc(id), docs.ownedDoc);
+      return saved;
+    });
   }
 
-  /// Persists a new complaint prepared by `ComplaintService.submit`.
+  /// Persists the result of a `ComplaintService` transition or admin edit and
+  /// returns [c] (every `ComplaintService` action reads the complaint with
+  /// [byId] first; the stored `version` that read saw is checked here).
   ///
-  /// TODO(C3): one `WriteBatch` / transaction: `complaints/{id}` (the 17
-  /// public keys from `toPublicView(draft).toJson()` via `jsonToFirestore`,
-  /// plus `version: 1`, `claimed: false`), `private/admin` (priority,
-  /// priorityOverride, severity, peopleAffected, assignment, actor timeline),
-  /// `private/identity` (the submitting reporter, `userId == auth.uid`) and
-  /// `userComplaints/{uid}/items/{id}`; all rules in firestore.rules
-  /// (`validNewComplaint`, `complaintCreatedInThisWrite`) assume this batch.
-  /// Complaint ID allocation (`counters/complaintIds-{year}` transaction) is
-  /// also C3; see the chunk report for the client-ID-collision caveat.
+  /// One Firestore transaction (the planning is `planComplaintUpdate`):
+  ///
+  /// * read the public and `private/admin` documents;
+  /// * a stored `version` other than the one [byId] saw, a `closed` complaint
+  ///   (INV-4) or a timeline that does not extend the stored one throws a
+  ///   [ComplaintConflictException] and writes nothing;
+  /// * update `complaints/{id}` (`version + 1`, status, effective priority,
+  ///   safety flag, department, resolution note, after photos, `updatedAt`,
+  ///   `claimed`, and the stored public timeline plus the new events: the
+  ///   timeline is append-only), update `private/admin`, and delete / create
+  ///   the `staffClaims/{uid}/items/{id}` marker of an assignee that left /
+  ///   was set.
+  ///
+  /// `private/identity` is never touched: it is written once, at submit.
+  ///
+  /// Every role goes through here; which role may take which edge is the
+  /// rules' status-transition mirror (`legalRoles`, `validStatusChange`,
+  /// `validSameStatusEdit`), so a transition the role may not take (a verifier
+  /// closing, a reporter doing anything) is rejected by the server with
+  /// `permission-denied`.
+  ///
+  /// Throws a [StateError] when [c] was not read with [byId] by the signed-in
+  /// user, or that read could not see `private/admin` (writing from
+  /// placeholders would corrupt the priority inputs).
   @override
-  Future<Complaint> submit(Complaint draft) => Future<Complaint>.error(
-    UnimplementedError('TODO(C3): FirebaseComplaintRepository.submit'),
-  );
+  Future<Complaint> update(Complaint c) async {
+    final AppUser? viewer = _viewer.currentUser;
+    if (viewer == null) {
+      throw StateError('FirebaseComplaintRepository.update: nobody is signed in.');
+    }
+    final _WriteBase? base = _bases[c.id];
+    if (base == null || base.uid != viewer.id) {
+      throw StateError(
+        'FirebaseComplaintRepository.update: read the complaint with byId '
+        'first (the write is checked against the version that read saw).',
+      );
+    }
+    if (!base.hasAdminDetail) {
+      throw StateError(
+        'FirebaseComplaintRepository.update: private/admin was not readable '
+        'for this complaint, so its priority inputs and assignment are '
+        'unknown (deploy the C3 firestore.rules: any signed-in user may read '
+        'private/admin).',
+      );
+    }
 
-  /// Persists changes made by `ComplaintService` (a transition or an admin edit).
-  ///
-  /// TODO(C3): one batch: public doc with `version + 1` (from [_versions]),
-  /// appended timeline, `claimed`, `updatedAt`; `private/admin` (**diff-based**:
-  /// non-admin viewers only hold placeholders for restricted fields, so write
-  /// with `FieldValue.arrayUnion` for the timeline and never overwrite fields
-  /// the viewer could not read); maintain `staffClaims` markers when the
-  /// assignee changes. The rules (`validUpdate`, `legalRoles`) reject anything
-  /// else.
-  @override
-  Future<Complaint> update(Complaint c) => Future<Complaint>.error(
-    UnimplementedError('TODO(C3): FirebaseComplaintRepository.update'),
-  );
+    final DocumentReference<Map<String, dynamic>> publicRef = _complaints.doc(
+      c.id,
+    );
+    final DocumentReference<Map<String, dynamic>> adminRef = _adminRef(c.id);
+    await _fb.firestore.runTransaction<void>((Transaction tx) async {
+      final DocumentSnapshot<Map<String, dynamic>> publicSnap = await tx.get(
+        publicRef,
+      );
+      final DocumentSnapshot<Map<String, dynamic>> adminSnap = await tx.get(
+        adminRef,
+      );
+      final Map<String, dynamic>? storedPublic = publicSnap.data();
+      if (storedPublic == null) {
+        throw ComplaintConflictException(c.id, 'This complaint no longer exists.');
+      }
+      final ComplaintUpdatePlan plan = planComplaintUpdate(
+        storedPublic: storedPublic,
+        storedAdmin: adminSnap.data(),
+        next: c,
+        expectedVersion: base.version,
+      );
+      tx.update(publicRef, plan.publicFields);
+      tx.update(adminRef, plan.adminFields);
+      final String? release = plan.releaseClaimOf;
+      if (release != null) tx.delete(_claimIndex(release).doc(c.id));
+      final String? take = plan.takeClaimFor;
+      if (take != null) {
+        tx.set(_claimIndex(take).doc(c.id), <String, Object?>{
+          'complaintId': c.id,
+        });
+      }
+    });
+    // The base is spent: the next write must start from a fresh read.
+    _bases.remove(c.id);
+    return c;
+  }
 
   /// The full list now and whenever it changes.
   ///
@@ -636,6 +846,26 @@ class _AdminEntry {
   final Map<String, Object?>? json;
 }
 
+/// What the last `byId` of one complaint saw: the optimistic-concurrency base
+/// of the next `update` (see `FirebaseComplaintRepository._bases`).
+class _WriteBase {
+  const _WriteBase({
+    required this.uid,
+    required this.version,
+    required this.hasAdminDetail,
+  });
+
+  /// The user who read it; another user's base is never reused.
+  final String uid;
+
+  /// The public document's `version` at that read.
+  final int version;
+
+  /// Whether the real `private/admin` was assembled (false: placeholders, so a
+  /// write would corrupt the priority inputs and is refused).
+  final bool hasAdminDetail;
+}
+
 /// One [FirebaseComplaintRepository.watchAll] subscription: the public
 /// `complaints` listener joined with the viewer's own index listeners (plan
 /// section 5.3), re-attached whenever the session's viewer changes.
@@ -704,6 +934,7 @@ class _ComplaintFeed {
     if (next == null) {
       // Signed out: drop the previous user's data from the app's state.
       _repo._adminCache.clear();
+      _repo._bases.clear();
       _emit(const <Complaint>[]);
       return;
     }

@@ -34,6 +34,7 @@ export 'logic/status_machine.dart';
 export 'repositories/auth_repository.dart';
 export 'repositories/complaint_repository.dart';
 export 'repositories/notification_repository.dart';
+export 'repositories/reporter_identity_revealer.dart';
 export 'repositories/user_repository.dart';
 
 // Services: the L3 transition executor and in-app notifications.

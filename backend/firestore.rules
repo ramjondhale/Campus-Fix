@@ -12,9 +12,10 @@ rules_version = '2';
 //     Admin-SDK seed script (backend/seed/seed.mjs), never by the client.
 //   * The 3-way document split (privacy mechanism, plan section 5):
 //       complaints/{id}                  PUBLIC projection (17 keys + version + claimed)
-//       complaints/{id}/private/admin    ADMIN-ONLY (priority inputs, full assignment, actor timeline)
+//       complaints/{id}/private/admin    priority inputs, full assignment, actor timeline (admin-only in prod; MVP delta (f))
 //       complaints/{id}/private/identity reporter PII (see the MVP delta (a) below)
-//   * The board is readable by every signed-in user; private/admin only by admins.
+//   * The board is readable by every signed-in user (private/admin: see the MVP
+//     delta (f) below - it is NOT admin-only in this MVP).
 //   * Ownership / claim indexes are readable by their owner only.
 //   * Default deny at the end (PV-2).
 //
@@ -31,16 +32,28 @@ rules_version = '2';
 //   (e) counters: signed-in read; monotonic +1 client writes on
 //       counters/complaintIds-{year} (the client allocates Complaint IDs in a
 //       transaction).                         prod: server only.
+//   (f) private/admin: readable by EVERY SIGNED-IN USER (was admin-only), so
+//       core's ComplaintService can run client-side for every role: it must
+//       read the real priority inputs (severity, peopleAffected), the full
+//       assignment (P6/P7, claim markers) and the actor timeline to validate and
+//       recompute, whoever acts. Consequence: a reporter/maintenance/verifier
+//       token that hand-crafts a request can read assignee ids, actor ids and
+//       the priority inputs of ANY complaint (the apps never show them; the
+//       board's public document is unchanged). private/identity stays
+//       ADMIN-ONLY: the reporter's name / ID / e-mail / phone are NOT exposed.
+//                                             prod: admin only (server executor).
 //
 // HONEST TRADEOFF: the MVP trusts the client for write INTEGRITY (e.g. the
 // priority value, the content of private/admin). Reads, identity privacy, the
 // transition matrix, and admin-only close ARE rules-enforced.
 //
-// OPEN (decide in C3 / C4 - see the chunk report):
+// OPEN (decide in C4 - see the chunk report):
 //   * Client-side notification fan-out needs staff ids (users/ is admin-only
 //     below) and the reporter's user id (a maintenance / verifier client cannot
-//     read private/identity). Either relax users/ or add a non-PII recipients
-//     doc; this file deliberately keeps the stricter plan rules until decided.
+//     read private/identity). C3 ships WITHOUT notifications (the apps swap in
+//     a no-op producer); C4 must either relax users/ or add a non-PII
+//     recipients doc (e.g. a reporterId on private/admin, now readable by every
+//     signed-in user, plus a staff-id roster).
 //   * Admin `all()` over private/admin needs one get() per complaint (there is
 //     no list rule on private/admin); a collection-group rule would also expose
 //     private/identity, so it is intentionally not added here.
@@ -194,10 +207,11 @@ service cloud.firestore {
           && (validStatusChange() || validSameStatusEdit());
     }
 
-    // private/admin: inputs the admin sees. Written by the acting client in the
-    // same batch as the public document (non-admins cannot read it back, so they
-    // append with FieldValue.arrayUnion). MVP trusts the content; the key set and
-    // timeline length are checked. prod: server only.
+    // private/admin: priority inputs, full assignment, actor timeline. Written by
+    // the acting client in the same batch as the public document (the client
+    // reads it first, MVP delta (f), and writes the whole document back with the
+    // appended event). MVP trusts the content; the key set and timeline length
+    // are checked. prod: server only.
     function validPrivateAdmin(id) {
       let d = request.resource.data;
       return d.keys().hasOnly(['priority', 'priorityOverride', 'severity', 'peopleAffected',
@@ -211,10 +225,15 @@ service cloud.firestore {
       allow update:    if validUpdate();
       allow delete:    if false;                   // complaints are never deleted (R6: permanent for the demo)
 
-      // Admin-only half of the aggregate (PR-T4: verifiers, maintenance and
-      // reporters are denied). `get` only - no list rule (see OPEN above).
+      // The "admin" half of the aggregate: priority inputs, full assignment,
+      // actor-bearing timeline. `get` only - no list rule (see OPEN above).
+      //   MVP delta (f): readable by EVERY signed-in user, because the client-side
+      //        ComplaintService needs the real values to validate and recompute
+      //        for every role (a verifier's Review & Route recomputes the
+      //        priority, a maintenance worker's Start work checks the claim).
+      //   prod: admin only (PR-T4: verifiers, maintenance and reporters denied).
       match /private/admin {
-        allow get:    if isAdmin();
+        allow get:    if signedIn();
         allow create: if signedIn() && complaintCreatedInThisWrite(complaintId)
                       && validPrivateAdmin(complaintId);
         allow update: if signedIn() && complaintVersionBumpedInThisWrite(complaintId)

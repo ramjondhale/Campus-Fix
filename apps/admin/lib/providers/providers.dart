@@ -11,6 +11,7 @@ export 'complaint_list.dart';
 export 'complaint_query.dart';
 export 'complaints.dart';
 export 'dashboard.dart';
+export 'identity_revealer.dart';
 export 'repositories.dart' hide complaintRepositoryProvider;
 export 'services.dart';
 export 'session.dart';

@@ -12,7 +12,8 @@ backend/
                            rewrite — Firebase forbids a public dir outside backend/), rules + indexes.
                            No "functions".
   .firebaserc              project aliases (REPLACE_WITH_DEV_PROJECT_ID until the dev project exists)
-  firestore.rules          3-way document split; reads production-grade; MVP client writes gated by the
+  firestore.rules          3-way document split; reads production-grade except `private/admin` (any
+                           signed-in user may read it, MVP delta (f)); MVP client writes gated by the
                            status-transition mirror. Header comment lists every MVP-vs-prod delta.
   firestore.indexes.json   plan section 5.4
   storage.rules            plan section 7 (MVP: authenticated create for final evidence)
@@ -25,12 +26,15 @@ backend/
 |------|-------------------|------------|
 | Writes | Client-side, reusing `campusfix_core` logic; **rules enforce** legal transitions, `version + 1`, append-only timeline, closed-is-immutable, admin-only close | Server executor (Cloud Functions / Cloud Run), clients cannot write `complaints/**` |
 | Identity | `private/identity` admin-**readable**; admin client writes the reveal audit entry (required reason) | No client read; reveal endpoint writes the audit first |
+| Admin half | `private/admin` readable by **every signed-in user** (so `ComplaintService` runs client-side for every role; `private/identity` stays admin-only) | Admin only; server executor |
 | Notifications | Writing client creates `notifications/*`; in-app feed only | Server fan-out + FCM push |
-| Complaint IDs | Client allocates in a transaction on `counters/complaintIds-{year}` | Server |
+| Complaint IDs | Client allocates in the submit transaction on `counters/complaintIds-{year}` (create at 1 / +1) | Server |
 | Roles | Custom claims set by `seed/seed.mjs` (Admin SDK, run locally) | Roster importer / server |
 
-Reads and identity privacy are rules-enforced from day one; the MVP trusts the client for write
-*integrity* (e.g. the priority value). Do not point real college data at this configuration.
+Reads and identity privacy are rules-enforced from day one (the one read relaxation is `private/admin`, see
+above); the MVP trusts the client for write *integrity* (e.g. the priority value). In-app notifications are
+**not produced yet** (C3 swaps in a no-op producer; C4 adds the fan-out). Do not point real college data at
+this configuration.
 
 ## Prerequisites
 

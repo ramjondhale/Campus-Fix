@@ -36,8 +36,14 @@ and keep everything free and simple:
 
 - **Firestore 3-way document split** — `complaints/{id}` (public), `complaints/{id}/private/admin`,
   `complaints/{id}/private/identity` — exactly as the full plan (§5), so the privacy model is the same.
-- **Security Rules enforce privacy on reads** (full plan §6.2): identity/admin docs are role-gated;
-  public doc is the 17-field projection. This part is production-grade from day one.
+- **Security Rules enforce privacy on reads** (full plan §6.2): the identity doc is admin-only; the
+  public doc is the 17-field projection. **MVP delta (C3): `private/admin` is readable by every
+  signed-in user** (it is admin-only in the full plan), so core's `ComplaintService` can run
+  client-side for every role — it needs the real priority inputs, assignment and actor timeline to
+  validate and recompute whoever acts. A hand-crafted request from any signed-in token can therefore
+  read assignee ids, actor ids and priority inputs; the apps never show them, the public document is
+  unchanged, and **`private/identity` stays admin-only** (reporter name / ID / e-mail / phone are not
+  exposed). Prod restores admin-only with the server executor.
 - **Writes run client-side**, reusing the already-tested `campusfix_core` logic (priority engine, status
   machine, assignment, notification templates). Rules enforce the **status-transition matrix** (full plan
   §6.3) and admin-only close. **Honest tradeoff:** the MVP trusts the client for write integrity
@@ -51,7 +57,9 @@ and keep everything free and simple:
   audit is tamper-proof.)
 - **Notifications:** **in-app feed only.** The writing client creates `notifications/{id}` docs using
   core's `NotificationService` recipient logic. **No background FCM push** in MVP (that needs a server
-  sender + APNs for iOS). Android in-app feed + badge work.
+  sender + APNs for iOS). Android in-app feed + badge work. **C3 ships without producing them** (see
+  "C3 notes" below): recipient resolution needs a fix first, so C3 swaps in a no-op producer and C4
+  adds the real fan-out.
 
 ### Upgrade path to prod (no app rewrite)
 Add Cloud Functions (Blaze) as the executor → server-authoritative writes, server-set claims, FCM
@@ -86,6 +94,44 @@ Claude do most of the setup **without touching that**:
 
 Each chunk keeps the mock entrypoint (`lib/main.dart`) working, and cuts over one provider at a time
 behind the `main_firebase.dart` override — same strategy as the full plan §11.3.
+
+## C3 notes (client-side write path)
+
+Implemented in `packages/campusfix_firebase` (`firebase_complaint_repository.dart`,
+`complaint_writes.dart`, `firebase_reporter_identity_revealer.dart`,
+`deferred_notification_service.dart`) and the two apps' `providers/firebase_overrides.dart`.
+
+- **One transaction per write.** `submit` allocates the next `CF-{year}-{NNNNN}` from
+  `counters/complaintIds-{year}` (create at 1 / increment by 1; the service's local ID generator is
+  ignored and the draft is re-keyed) and writes the public doc (`version: 1`, `claimed: false`),
+  `private/admin`, `private/identity` and `userComplaints/{uid}/items/{id}`. `update` reads the public
+  and `private/admin` docs, checks the stored `version` against the one the last `byId` saw, then
+  writes `version + 1`, the append-only timeline, the new `updatedAt`, `private/admin` and the
+  `staffClaims/{uid}/items/{id}` marker of a changed assignee. A stale version or a `closed` complaint
+  throws `ComplaintConflictException` (nothing written).
+- **`byId` is the write base.** Every `ComplaintService` action starts with `byId`; it reads
+  `private/admin` for every role (the rules delta above) so the service recomputes priorities and
+  checks P6/P7 on real data. List / stream reads keep the placeholder assembly for non-admins.
+- **Rules.** Only `private/admin` `get` changed (admin-only -> signed-in). The existing
+  `legalRoles` mirror already admits every transition for the right role: submit (reporter),
+  Review & Route (verifier / admin, T1 or the T1+T2 composite), assign (verifier / admin), start /
+  resolve (maintenance / admin), verify and reject (verifier / admin), **close (admin only)**,
+  reassign / priority override / safety flag (admin).
+- **Identity reveal (D4).** Admin-only. `FirebaseReporterIdentityRevealer.reveal(id, reason:)` is one
+  transaction: read `private/identity` + write one `auditLog` entry
+  `{ type: 'identityReveal', actorUid, actorRole, complaintId, reason, at, requestId }`; the identity
+  is returned only after the commit (fail-closed). A-04's **Reveal reporter identity** asks for a
+  required reason (`AppDialog.confirmWithNote`) when the revealer is wired (Firebase entrypoint); the
+  offline demo is unchanged.
+- **No notifications in C3.** `ComplaintService` builds notifications *before* it persists, and
+  `NotificationService.buildFor` lists the user directory (`users/` is admin-only, staff only) and
+  addresses the owner audience at `reporter.userId` (`private/identity`, admin-only; the assembled
+  complaint carries `''`). That would abort every non-admin write, and for an admin it would address the owner notification to `''` (rejected by the `notifications` rule). C3 overrides
+  `notificationServiceProvider` with `DeferredNotificationService` (its `buildFor` returns nothing;
+  the feed / mark-read half is unchanged). **C4:** resolve recipients without the directory or the
+  identity doc (e.g. a non-PII `reporterId` on `private/admin`, readable by every signed-in user since
+  C3, and a staff-id roster), build the notifications **after** `submit` returns (the repository
+  replaces the draft's Complaint ID), and delete the override.
 
 ## Orchestration
 Opus orchestrator plans/decides/verifies; Sonnet agents implement each chunk (own worktree/branch);
