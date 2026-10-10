@@ -22,8 +22,11 @@ url: "https://ramjondhale.github.io"
 baseurl: "/Campus-Fix"
 repository: ramjondhale/Campus-Fix
 
-# Theme: simple, renders plain Markdown well, needs no navigation front matter.
-theme: jekyll-theme-cayman
+# Theme: a self-contained CampusFix theme (NOT a gem). The layout lives in
+# docs/_layouts/default.html and the stylesheet in docs/assets/css/style.css; both are
+# built from the campusfix_design tokens (petrol-teal, Archivo / Public Sans / JetBrains
+# Mono, light + dark) so the docs site matches the app. No `theme:`/`remote_theme:` key,
+# so GitHub Pages uses our own layout instead of a generic gem (e.g. Cayman).
 show_downloads: false
 
 markdown: kramdown
