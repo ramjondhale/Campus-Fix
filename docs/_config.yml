@@ -1,0 +1,79 @@
+# CampusFix documentation site (GitHub Pages, "Deploy from a branch" -> main /docs).
+#
+# Published at https://ramjondhale.github.io/Campus-Fix/
+#
+# Design goals:
+#   * No front matter is needed on the existing docs: every *.md in docs/ is
+#     rendered with the theme layout via `defaults` + jekyll-optional-front-matter.
+#   * Existing relative links such as [x](ARCHITECTURE.md) or [x](specs/privacy-spec.md)
+#     are rewritten to the rendered pages by jekyll-relative-links.
+#   * Page URLs keep the default ".html" style (/WALKTHROUGH.html, /specs/privacy-spec.html)
+#     so that relative links to static files such as design/design-system.html still resolve.
+#
+# Local preview (needs Ruby + the github-pages gem; not required for publishing):
+#   bundle exec jekyll serve --baseurl ""      # then open http://localhost:4000/
+
+title: CampusFix
+description: A privacy-first college complaint & maintenance app. Flutter + Firebase.
+lang: en
+
+# Project site: https://<user>.github.io/<repo>/
+url: "https://ramjondhale.github.io"
+baseurl: "/Campus-Fix"
+repository: ramjondhale/Campus-Fix
+
+# Theme: simple, renders plain Markdown well, needs no navigation front matter.
+theme: jekyll-theme-cayman
+show_downloads: false
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# All of these ship with GitHub Pages; listed explicitly so the behaviour is documented.
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+  - jekyll-default-layout
+  - jekyll-github-metadata
+  - jekyll-seo-tag
+
+# Rewrite [text](Other.md) -> the rendered URL of Other.md.
+relative_links:
+  enabled: true
+  collections: false
+
+# Render docs that have no front matter; drop the raw .md copies from the built site.
+optional_front_matter:
+  remove_originals: true
+
+# Page titles come from each doc's first "# Heading".
+titles_from_headings:
+  enabled: true
+  strip_title: false
+  collections: false
+
+# Give EVERY page the theme layout, so the existing docs need no front matter.
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+  # design/design-system.md and design/design-system.html would both build to
+  # /design/design-system.html (page vs. static file) and one would overwrite the other.
+  # Give the Markdown contract its own URL; the HTML style guide keeps the original one.
+  - scope:
+      path: "design/design-system.md"
+    values:
+      permalink: /design/design-contract.html
+
+# The build-process archive (docs/process/) is kept IN the site because the Walkthrough and
+# the Phase-2 plan link to process/RUN-LEDGER.md and process/PLAN.md. To drop it from the
+# public site instead, add "process" here and remove those links first.
+exclude:
+  - node_modules
+  - vendor
+  - Gemfile
+  - Gemfile.lock

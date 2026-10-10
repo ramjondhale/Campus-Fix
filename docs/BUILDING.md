@@ -12,7 +12,7 @@
 ## Core & design (pure Dart / Flutter packages) — all green
 ```bash
 cd packages/campusfix_core && dart test        # 651 tests
-cd packages/campusfix_design && flutter test   # 224 tests
+cd packages/campusfix_design && flutter test   # 232 tests
 cd apps/mobile && flutter test                 # mobile widget/flow tests
 ```
 
