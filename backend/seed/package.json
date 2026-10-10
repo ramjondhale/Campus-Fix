@@ -1,0 +1,17 @@
+{
+  "name": "campusfix-seed",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CampusFix dev/demo seeder: provisions Auth users + custom claims and loads Firestore from seed.json (Admin SDK, run locally; not a deployed Function).",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "seed": "node seed.mjs",
+    "seed:dry": "node seed.mjs --dry-run"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

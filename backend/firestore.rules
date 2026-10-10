@@ -1,0 +1,318 @@
+rules_version = '2';
+
+// =============================================================================
+// CampusFix Firestore Security Rules - MVP (Spark / free, NO Cloud Functions)
+//
+// Source: docs/phase-2-firebase-plan.md section 6.2 (production design), adapted
+// by docs/phase-2-mvp.md. READ-side privacy is production-grade from day one;
+// the WRITE side is the MVP simplification.
+//
+// WHAT IS THE SAME AS PRODUCTION
+//   * Caller identity = custom claims (role, department) set by the local
+//     Admin-SDK seed script (backend/seed/seed.mjs), never by the client.
+//   * The 3-way document split (privacy mechanism, plan section 5):
+//       complaints/{id}                  PUBLIC projection (17 keys + version + claimed)
+//       complaints/{id}/private/admin    ADMIN-ONLY (priority inputs, full assignment, actor timeline)
+//       complaints/{id}/private/identity reporter PII (see the MVP delta (a) below)
+//   * The board is readable by every signed-in user; private/admin only by admins.
+//   * Ownership / claim indexes are readable by their owner only.
+//   * Default deny at the end (PV-2).
+//
+// WHAT DIFFERS (each delta is marked "MVP: ... ; prod: ..." where it occurs)
+//   (a) private/identity: admin-READABLE (the admin client reveals it and writes
+//       the audit entry itself).            prod: no client read at all; server only.
+//   (b) complaints: CLIENT WRITES allowed, gated by the status-machine mirror
+//       (plan section 6.3): legal role per edge, version + 1, append-only timeline,
+//       closed is immutable, close is admin-only.   prod: server executor only.
+//   (c) notifications: authenticated CREATE (the writing client fans out); the
+//       recipient may update only `read`.     prod: server creates.
+//   (d) auditLog: admin read + admin create (the admin client writes the reveal
+//       audit, with a required reason).       prod: server-only, tamper-proof.
+//   (e) counters: signed-in read; monotonic +1 client writes on
+//       counters/complaintIds-{year} (the client allocates Complaint IDs in a
+//       transaction).                         prod: server only.
+//
+// HONEST TRADEOFF: the MVP trusts the client for write INTEGRITY (e.g. the
+// priority value, the content of private/admin). Reads, identity privacy, the
+// transition matrix, and admin-only close ARE rules-enforced.
+//
+// OPEN (decide in C3 / C4 - see the chunk report):
+//   * Client-side notification fan-out needs staff ids (users/ is admin-only
+//     below) and the reporter's user id (a maintenance / verifier client cannot
+//     read private/identity). Either relax users/ or add a non-PII recipients
+//     doc; this file deliberately keeps the stricter plan rules until decided.
+//   * Admin `all()` over private/admin needs one get() per complaint (there is
+//     no list rule on private/admin); a collection-group rule would also expose
+//     private/identity, so it is intentionally not added here.
+//
+// Rules are NOT filters: every list query must be constrained to documents the
+// caller may read (e.g. notifications by recipientId, users by role).
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- the caller: custom claims set by the Admin SDK ----------------------
+    function signedIn()       { return request.auth != null; }
+    function role()           { return request.auth.token.get('role', ''); }   // reporter | maintenance | verifier | admin
+    function isAdmin()        { return signedIn() && role() == 'admin'; }      // == UserRole.canSeeReporterIdentity
+    function isOwnerPath(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // ---- cross-document helpers (batch-aware) --------------------------------
+    // exists()/get() see the state BEFORE the write (batch); existsAfter()/getAfter()
+    // see the state AFTER it. A multi-document client write (complaint + private
+    // docs + indexes) is therefore validated as one unit.
+    function complaintExistsBefore(id) { return exists(/databases/$(database)/documents/complaints/$(id)); }
+    function complaintExistsAfter(id)  { return existsAfter(/databases/$(database)/documents/complaints/$(id)); }
+    function complaintBefore(id)       { return get(/databases/$(database)/documents/complaints/$(id)).data; }
+    function complaintAfter(id)        { return getAfter(/databases/$(database)/documents/complaints/$(id)).data; }
+
+    function complaintCreatedInThisWrite(id) {
+      return !complaintExistsBefore(id) && complaintExistsAfter(id);
+    }
+    function complaintVersionBumpedInThisWrite(id) {
+      return complaintExistsBefore(id) && complaintExistsAfter(id)
+          && complaintAfter(id).version == complaintBefore(id).version + 1;
+    }
+
+    // ---- directory ------------------------------------------------------------
+    match /users/{uid} {
+      // Admins may read STAFF profiles only (A-04 staff names, assignee picker).
+      // Reporter profiles are self-readable only: a reporter's name cannot surface
+      // before the audited reveal. List queries must constrain `role` with whereIn.
+      allow get:   if isOwnerPath(uid)
+                   || (isAdmin() && resource.data.role in ['maintenance', 'verifier', 'admin']);
+      allow list:  if isAdmin() && resource.data.role in ['maintenance', 'verifier', 'admin'];
+      allow write: if false;                       // provisioned by the Admin SDK (seed script) only
+      // Push is deferred in the MVP: users/{uid}/fcmTokens is added with FCM.
+    }
+
+    // ---- complaint aggregate (3-way split) ------------------------------------
+
+    // The PUBLIC document key set: PublicComplaintView.toJson() (17 keys) plus the
+    // two non-PII helpers `version` (optimistic concurrency, rule P8) and
+    // `claimed` (an assignee is named; lets the maintenance queue apply P7).
+    // Mirrors the PR-T2 allow-list: adding a field is a deliberate act.
+    function publicKeys() {
+      return ['id', 'category', 'title', 'building', 'floor', 'room', 'description',
+              'beforePhotos', 'afterPhotos', 'effectivePriority', 'status', 'safetyFlag',
+              'assignedDepartment', 'resolutionNote', 'timeline', 'createdAt', 'updatedAt',
+              'version', 'claimed'];
+    }
+
+    // Status-transition mirror (plan section 6.3; status-machine-spec L1 + the
+    // product's admin-only close). `edges` maps 'from>to' to the roles that may
+    // take it. 'reported>assigned' is the Review & Route composite (T1 then T2 in
+    // ONE client write, two timeline events).
+    function legalRoles(fromStatus, toStatus) {
+      let edges = {
+        'reported>reviewed':   ['verifier', 'admin'],        // T1
+        'reported>assigned':   ['verifier', 'admin'],        // T1 + T2 composite (Review & Route)
+        'reviewed>assigned':   ['verifier', 'admin'],        // T2
+        'assigned>inProgress': ['maintenance', 'admin'],     // T3
+        'inProgress>resolved': ['maintenance', 'admin'],     // T4
+        'resolved>verified':   ['verifier', 'admin'],        // T5
+        'verified>closed':     ['admin'],                    // T6 admin-only close (S-7 / D5)
+        'resolved>inProgress': ['verifier', 'admin'],        // T7 reject
+        'inProgress>assigned': ['admin']                     // T8 pull-back
+      };
+      return edges.get(fromStatus + '>' + toStatus, []);
+    }
+
+    // Number of timeline events one write must append for a status change.
+    function eventsAppended(fromStatus, toStatus) {
+      return (fromStatus == 'reported' && toStatus == 'assigned') ? 2 : 1;
+    }
+
+    // A status CHANGE: legal edge for the caller's role, and exactly the right
+    // number of timeline events appended.
+    function validStatusChange() {
+      let fromStatus = resource.data.status;
+      let toStatus = request.resource.data.status;
+      return fromStatus != toStatus
+          && role() in legalRoles(fromStatus, toStatus)
+          && request.resource.data.timeline.size()
+               == resource.data.timeline.size() + eventsAppended(fromStatus, toStatus);
+    }
+
+    // A same-status edit (priority override, safety flag, reassignment annotation
+    // event): admin only. Appends 0 events (override / safety flag) or 1
+    // (annotation event while already `assigned`).
+    function validSameStatusEdit() {
+      let appended = request.resource.data.timeline.size() - resource.data.timeline.size();
+      return request.resource.data.status == resource.data.status
+          && isAdmin()
+          && (appended == 0 || appended == 1);
+    }
+
+    // Fields that never change after submit.
+    function coreFieldsUnchanged() {
+      let d = request.resource.data;
+      let prev = resource.data;
+      return d.id == prev.id
+          && d.category == prev.category
+          && d.title == prev.title
+          && d.building == prev.building
+          && d.floor == prev.floor
+          && d.room == prev.room
+          && d.description == prev.description
+          && d.createdAt == prev.createdAt;
+    }
+
+    // MVP: a signed-in client may SUBMIT a complaint, but only as a fresh
+    // `reported` complaint (version 1, one timeline event, not claimed), with the
+    // ownership index written in the same batch. Complaint ID format is enforced.
+    // prod: the server executor submits.
+    function validNewComplaint(id) {
+      let d = request.resource.data;
+      return signedIn()
+          && d.keys().hasOnly(publicKeys())
+          && d.keys().hasAll(publicKeys())
+          && id.matches('CF-[0-9]{4}-[0-9]{5}')
+          && d.id == id
+          && d.status == 'reported'
+          && d.version == 1
+          && d.claimed == false
+          && d.timeline.size() == 1
+          && d.timeline[0].status == 'reported'
+          && d.timeline[0].actorRole == role()
+          && existsAfter(/databases/$(database)/documents/userComplaints/$(request.auth.uid)/items/$(id));
+    }
+
+    // MVP: a signed-in client may UPDATE a complaint iff the change is a legal
+    // transition / admin edit: not closed (INV-4), version + 1 (P8), public key set
+    // intact, timeline append-only. prod: the server executor updates.
+    function validUpdate() {
+      let d = request.resource.data;
+      let prev = resource.data;
+      return signedIn()
+          && prev.status != 'closed'
+          && d.keys().hasOnly(publicKeys())
+          && d.version == prev.version + 1
+          && coreFieldsUnchanged()
+          && d.timeline[0:prev.timeline.size()] == prev.timeline
+          && (validStatusChange() || validSameStatusEdit());
+    }
+
+    // private/admin: inputs the admin sees. Written by the acting client in the
+    // same batch as the public document (non-admins cannot read it back, so they
+    // append with FieldValue.arrayUnion). MVP trusts the content; the key set and
+    // timeline length are checked. prod: server only.
+    function validPrivateAdmin(id) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['priority', 'priorityOverride', 'severity', 'peopleAffected',
+                               'assignment', 'timeline'])
+          && d.timeline.size() == complaintAfter(id).timeline.size();
+    }
+
+    match /complaints/{complaintId} {
+      allow get, list: if signedIn();              // the campus board is visible to every signed-in user (R6)
+      allow create:    if validNewComplaint(complaintId);
+      allow update:    if validUpdate();
+      allow delete:    if false;                   // complaints are never deleted (R6: permanent for the demo)
+
+      // Admin-only half of the aggregate (PR-T4: verifiers, maintenance and
+      // reporters are denied). `get` only - no list rule (see OPEN above).
+      match /private/admin {
+        allow get:    if isAdmin();
+        allow create: if signedIn() && complaintCreatedInThisWrite(complaintId)
+                      && validPrivateAdmin(complaintId);
+        allow update: if signedIn() && complaintVersionBumpedInThisWrite(complaintId)
+                      && validPrivateAdmin(complaintId);
+        allow delete: if false;
+      }
+
+      // Reporter identity.
+      //   MVP: admin-readable (the admin client reveals it and writes the audit
+      //        entry itself); the submitting reporter may create it once, for
+      //        themself, in the creating batch.
+      //   prod: NO client read or write at all; released only by the reveal endpoint.
+      match /private/identity {
+        allow get:    if isAdmin();
+        allow create: if signedIn() && complaintCreatedInThisWrite(complaintId)
+                      && request.resource.data.keys().hasOnly(['userId', 'fullName', 'idNumber', 'email', 'phone'])
+                      && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---- the only links from a person to a complaint ---------------------------
+    match /userComplaints/{uid}/items/{complaintId} {
+      allow get, list: if isOwnerPath(uid);        // owner only: not admins, not verifiers
+      // MVP: the submitting client writes its own ownership marker in the creating batch.
+      allow create:    if isOwnerPath(uid) && complaintCreatedInThisWrite(complaintId);
+      allow update, delete: if false;
+    }
+    match /staffClaims/{uid}/items/{complaintId} {
+      allow get, list: if isOwnerPath(uid);
+      // MVP: a claim marker is written / removed by the claimer (T3/T4) or by an
+      // admin (naming or clearing an assignee), in the batch that bumps the complaint.
+      allow create, delete: if signedIn() && (request.auth.uid == uid || isAdmin())
+                            && complaintVersionBumpedInThisWrite(complaintId);
+      allow update: if false;
+    }
+
+    // ---- notifications: in-app feed only (no FCM in the MVP) --------------------
+    function validNotification(id) {
+      let d = request.resource.data;
+      return signedIn()
+          && d.keys().hasOnly(['id', 'recipientId', 'complaintId', 'type', 'title', 'body', 'createdAt', 'read'])
+          && d.keys().hasAll(['id', 'recipientId', 'complaintId', 'type', 'title', 'body', 'createdAt', 'read'])
+          && d.id == id
+          && d.read == false
+          && d.type in ['submission', 'assignment', 'statusChange', 'completion', 'closure']
+          && d.recipientId is string && d.recipientId.size() > 0
+          && complaintExistsAfter(d.complaintId);
+    }
+    match /notifications/{id} {
+      allow get, list: if signedIn() && resource.data.recipientId == request.auth.uid;
+      // MVP: any authenticated client creates (the writing client fans out, using
+      // core's NotificationService). prod: server creates; `allow create: if false`.
+      allow create:    if validNotification(id);
+      // The recipient may flip `read` only.
+      allow update:    if signedIn() && resource.data.recipientId == request.auth.uid
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete:    if false;
+    }
+
+    // ---- append-only audit log (privacy-spec section 9) -------------------------
+    // MVP: the admin client writes the identity-reveal entry (D4: required reason);
+    // `at` must be the server time. prod: server-only ("admin-unwritable").
+    match /auditLog/{entryId} {
+      allow get, list: if isAdmin();
+      allow create:    if isAdmin()
+                       && request.resource.data.keys().hasOnly(['type', 'actorUid', 'actorRole', 'complaintId',
+                                                               'reason', 'at', 'requestId'])
+                       && request.resource.data.type in ['identityReveal', 'priorityOverride', 'manualAssignment',
+                                                         'reassignment', 'statusChangeOnBehalf']
+                       && request.resource.data.actorUid == request.auth.uid
+                       && request.resource.data.at == request.time
+                       && (request.resource.data.type != 'identityReveal'
+                           || (request.resource.data.reason is string && request.resource.data.reason.size() > 0));
+      allow update, delete: if false;
+    }
+
+    // ---- Complaint ID counters ----------------------------------------------------
+    // MVP: counters/complaintIds-{year} = { last: <int> }. The client allocates the
+    // next Complaint ID inside a Firestore transaction, so the only legal write is
+    // creating it at 1 or incrementing by exactly 1 (cap 99999, as in core's
+    // ComplaintIdGenerator). prod: the server allocates; `allow write: if false`.
+    match /counters/{doc} {
+      allow get: if signedIn();
+      allow create: if signedIn() && doc.matches('complaintIds-[0-9]{4}')
+                    && request.resource.data.keys().hasOnly(['last'])
+                    && request.resource.data.last == 1;
+      allow update: if signedIn() && doc.matches('complaintIds-[0-9]{4}')
+                    && request.resource.data.keys().hasOnly(['last'])
+                    && request.resource.data.last == resource.data.last + 1
+                    && request.resource.data.last <= 99999;
+      allow delete: if false;
+    }
+
+    // ---- default deny (PV-2) ------------------------------------------------------
+    // (config/ and requests/ from the full plan are not used by the MVP.)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

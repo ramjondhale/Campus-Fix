@@ -1,0 +1,17 @@
+# Seeder dependencies and the generated seed (rebuild with tool/export_seed.dart).
+seed/node_modules/
+seed/seed.json
+
+# Service-account keys and credentials: NEVER commit (see README "Dev project").
+*-sa-key.json
+*serviceAccount*.json
+service-account*.json
+*.pem
+
+# Firebase CLI / emulator output
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+.runtimeconfig.json

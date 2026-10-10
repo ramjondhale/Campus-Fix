@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "REPLACE_WITH_DEV_PROJECT_ID",
+    "dev": "REPLACE_WITH_DEV_PROJECT_ID"
+  }
+}

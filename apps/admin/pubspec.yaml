@@ -40,6 +40,8 @@ dependencies:
     path: ../../packages/campusfix_design
   campusfix_core:
     path: ../../packages/campusfix_core
+  campusfix_firebase:
+    path: ../../packages/campusfix_firebase
 
 dev_dependencies:
   flutter_test:

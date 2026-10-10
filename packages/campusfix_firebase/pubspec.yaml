@@ -1,0 +1,27 @@
+name: campusfix_firebase
+description: CampusFix AI Firebase implementations of the campusfix_core repository interfaces (Auth, Firestore).
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.11.1
+  flutter: ">=1.17.0"
+
+# Dependency direction: campusfix_core <- campusfix_firebase <- apps. This is the
+# ONLY package (besides the apps' main_firebase.dart entrypoints) that imports
+# Firebase plugins; campusfix_core and campusfix_design stay Firebase-free.
+dependencies:
+  flutter:
+    sdk: flutter
+  # Versions follow what is already resolved in the local pub cache (Flutter 3.41);
+  # the orchestrator confirms them with `flutter pub get`.
+  firebase_core: ^4.5.0
+  cloud_firestore: ^6.1.3
+  firebase_auth: ^6.2.0
+  campusfix_core:
+    path: ../campusfix_core
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

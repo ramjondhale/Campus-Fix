@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// =============================================================================
+// CampusFix Cloud Storage Rules - MVP (Spark / free, NO Cloud Functions)
+//
+// Source: docs/phase-2-firebase-plan.md section 7, adapted by docs/phase-2-mvp.md.
+// Photos are not part of the MVP chunks yet (the apps still attach bundled sample
+// photos); these rules are deployed so the bucket is closed-by-default and ready.
+//
+// MVP vs prod
+//   * uploads/{uid}/**              staging area: the uploader only.      (same as prod)
+//   * complaints/{id}/{kind}/**     final evidence.
+//       MVP:  any authenticated user may CREATE (the client writes the final
+//             object directly; image-only, size-capped, create-only - an object
+//             can never be overwritten or deleted from a client).
+//             Storage rules cannot cheaply prove "owner of THIS complaint"
+//             without a cross-service firestore.exists() lookup, so MVP gates on
+//             sign-in. Hardening option: firestore.exists() on
+//             userComplaints/{uid}/items/{complaintId} (before) /
+//             staffClaims/{uid}/items/{complaintId} (after).
+//       prod: executor-only (`allow write: if false`); the server re-encodes,
+//             strips EXIF/GPS and stamps the clean copy (plan section 7).
+//       READ: every signed-in user (same audience as the public complaint).
+// =============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // staging: the uploader only; images only; size-capped; never updated or
+    // deleted from a client. No original file names are kept (privacy class P3).
+    match /uploads/{uid}/{draftId}/{fileName} {
+      allow create: if request.auth != null && request.auth.uid == uid
+                    && request.resource.size < 5 * 1024 * 1024
+                    && request.resource.contentType.matches('image/(jpeg|png|webp|heic)');
+      allow read:   if request.auth != null && request.auth.uid == uid;
+      allow update, delete: if false;
+    }
+
+    // final evidence (before / after photos).
+    match /complaints/{complaintId}/{kind}/{fileName} {
+      allow read:   if request.auth != null;
+      // MVP: authenticated create. prod: executor-only (no client write).
+      allow create: if request.auth != null
+                    && request.resource.size < 5 * 1024 * 1024
+                    && request.resource.contentType.matches('image/(jpeg|png|webp|heic)');
+      allow update, delete: if false;
+    }
+
+    // default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
