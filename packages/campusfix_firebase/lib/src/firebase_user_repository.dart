@@ -17,6 +17,13 @@ import 'firestore_codec.dart';
 /// The document has no `id` field (the document id is the uid, which equals
 /// `AppUser.id`); [documentToJson] adds it for `AppUser.fromJson`.
 ///
+/// C2 review (no code change): the three queries match `firestore.rules`
+/// (`list` needs `isAdmin()` and a `role` constraint within the staff roles;
+/// [all] uses `whereIn` over exactly those three, [maintenanceByDepartment] an
+/// equality on `maintenance`; neither needs a composite index). If the emulator
+/// ever rejects the `whereIn` form of [all] as admin, replace it with one
+/// `role ==` query per staff role, run in parallel.
+///
 /// TODO(C1): verify against the emulator once the seed has written `users/*`.
 /// TODO(C4): non-admin clients cannot list users under these rules, but core's
 /// client-side `NotificationService.buildFor` calls [all] to resolve recipients.

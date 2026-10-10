@@ -1,6 +1,12 @@
+import 'dart:async';
+
 import 'package:campusfix_core/campusfix_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'campus_fix_firebase.dart';
+import 'firebase_auth_repository.dart';
+import 'firestore_codec.dart';
 
 /// The fixed, opaque assignee id a **maintenance** viewer sees on a complaint
 /// that a *colleague* has claimed (plan section 5.3). It identifies nobody; it
@@ -154,8 +160,29 @@ String? _placeholderAssigneeId(
 /// viewer is read from [AuthRepository.currentUser] on every call, so a
 /// sign-out / sign-in swap needs no new repository.
 ///
-/// Skeleton: the signatures are final; the bodies land in
-/// **C2 (reads)** and **C3 (writes)**.
+/// ## What each read touches (C2; plan sections 5.3 and 6.2, seam S-4)
+///
+/// | viewer | Firestore reads |
+/// |---|---|
+/// | admin | public `complaints` + one `private/admin` get per complaint (cached per `version` + `updatedAt`, so only changed complaints are re-read) |
+/// | maintenance | public `complaints` + own `userComplaints/{uid}/items` + own `staffClaims/{uid}/items` |
+/// | reporter, verifier | public `complaints` + own `userComplaints/{uid}/items` |
+/// | signed out | nothing (empty list / `null`; the rules would deny it anyway) |
+///
+/// `private/identity` is **never** read here: the assembled `reporter` is always
+/// a placeholder (an admin gets the real identity only through the audited
+/// reveal, TODO(C3)).
+///
+/// **Not bounded yet.** Plan S-11 / R1 asks for bounded listeners (open
+/// complaints plus recent closed). The MVP demo board is the whole seed (29
+/// complaints), `My complaints` is computed from the same list, and bounding
+/// would hide old closed complaints from it, so [all] and [watchAll] read every
+/// complaint. Revisit with the load check (R1).
+///
+/// A document that cannot be decoded (a malformed or hand-edited document) is
+/// skipped with a `debugPrint` rather than failing the whole board.
+///
+/// The write methods ([submit], [update]) are still C3 stubs.
 class FirebaseComplaintRepository implements ComplaintRepository {
   FirebaseComplaintRepository(
     CampusFixFirebase fb, {
@@ -163,68 +190,323 @@ class FirebaseComplaintRepository implements ComplaintRepository {
   }) : _fb = fb,
        _viewer = viewer;
 
-  // TODO(C2): used by the read methods; unused while they are stubs.
-  // ignore: unused_field
   final CampusFixFirebase _fb;
-  // ignore: unused_field
   final AuthRepository _viewer;
 
   /// `version` of each complaint as last read (optimistic concurrency, rule
   /// P8). `Complaint` has no version field, so the repository remembers it and
-  /// writes `version + 1` on [update].
-  // TODO(C3): populate on every read; used by update().
-  // ignore: unused_field
+  /// writes `version + 1` on [update]. Populated by every read in this file.
+  // TODO(C3): consumed by update().
   final Map<String, int> _versions = <String, int>{};
 
-  /// All complaints visible to the viewer.
-  ///
-  /// TODO(C2): query `complaints` (bound it per plan S-11: open complaints plus
-  /// recent closed), `documentToJson` each, load the viewer's `userComplaints`
-  /// and `staffClaims` id sets (owner-only reads), and [assembleComplaint] each.
-  /// For an admin also `get` `private/admin` per complaint (the rules have no
-  /// list rule on it; see the OPEN note in firestore.rules).
-  @override
-  Future<List<Complaint>> all() => Future<List<Complaint>>.error(
-    UnimplementedError('TODO(C2): FirebaseComplaintRepository.all'),
-  );
+  /// `private/admin` reads of the admin viewer, keyed by complaint id and valid
+  /// while the public document's `version` + `updatedAt` are unchanged (the
+  /// rules only let a client change `private/admin` in the same batch that
+  /// bumps the public `version`). Keeps [all] / [watchAll] at one extra read
+  /// per *changed* complaint instead of one per complaint per call (risk R2).
+  /// Cleared when the session ends or a non-admin takes over.
+  final Map<String, _AdminEntry> _adminCache = <String, _AdminEntry>{};
 
-  /// TODO(C2): `complaints/{id}` get (+ `private/admin` for an admin) +
-  /// membership of the viewer's `userComplaints` / `staffClaims`; `null` when
-  /// the document does not exist.
+  // ---------------------------------------------------------------------------
+  // References
+  // ---------------------------------------------------------------------------
+
+  CollectionReference<Map<String, dynamic>> get _complaints =>
+      _fb.firestore.collection('complaints');
+
+  CollectionReference<Map<String, dynamic>> _ownedIndex(String uid) => _fb
+      .firestore
+      .collection('userComplaints')
+      .doc(uid)
+      .collection('items');
+
+  CollectionReference<Map<String, dynamic>> _claimIndex(String uid) =>
+      _fb.firestore.collection('staffClaims').doc(uid).collection('items');
+
+  DocumentReference<Map<String, dynamic>> _adminRef(String complaintId) =>
+      _complaints.doc(complaintId).collection('private').doc('admin');
+
+  // ---------------------------------------------------------------------------
+  // Reads
+  // ---------------------------------------------------------------------------
+
+  /// Every complaint the viewer may see (the whole board; see the class doc on
+  /// bounding).
+  ///
+  /// Reads: public `complaints` (all roles) in parallel with the viewer's own
+  /// index sets (non-admin), then, **admin only**, one `private/admin` get per
+  /// complaint that is not in the cache (plan R2: N gets on the first call,
+  /// only changed complaints afterwards).
   @override
-  Future<Complaint?> byId(String id) => Future<Complaint?>.error(
-    UnimplementedError('TODO(C2): FirebaseComplaintRepository.byId'),
-  );
+  Future<List<Complaint>> all() => _readQuery(_complaints);
+
+  /// The complaint with [id], or `null` when it does not exist (or nobody is
+  /// signed in).
+  ///
+  /// Reads: public `complaints/{id}` in parallel with a membership get on the
+  /// viewer's own `userComplaints` (non-admin) / `staffClaims` (maintenance)
+  /// index; admin: plus a fresh `private/admin` get (never from the cache,
+  /// because `ComplaintService` validates transitions against this copy).
+  @override
+  Future<Complaint?> byId(String id) async {
+    final AppUser? viewer = _viewer.currentUser;
+    if (viewer == null || !_isDocumentId(id)) return null;
+
+    final (doc, indexes) = await _both(
+      _complaints.doc(id).get(),
+      _membershipIndexes(viewer, id),
+    );
+    if (!doc.exists) return null;
+
+    final List<Complaint> found = await _finish(
+      viewer,
+      <DocumentSnapshot<Map<String, dynamic>>>[doc],
+      indexes,
+      useCache: false,
+    );
+    return found.isEmpty ? null : found.first;
+  }
 
   /// Complaints filed by [userId].
   ///
-  /// TODO(C2): rules only let a user read their own `userComplaints/{uid}/items`,
-  /// so this reads that index and fetches each complaint by id; a [userId] that
-  /// is not the viewer yields an empty list (the mock's `reporter.userId`
-  /// filter cannot be served for other users).
+  /// Rules only let a user read their own `userComplaints/{uid}/items`, so this
+  /// reads that index and then fetches the complaints by id (`whereIn` on the
+  /// document id, in chunks of 10). A [userId] that is not the signed-in viewer
+  /// yields an empty list: the mock's `reporter.userId` filter cannot be served
+  /// for other users, and an admin has no way to list another user's index.
   @override
-  Future<List<Complaint>> byReporter(String userId) =>
-      Future<List<Complaint>>.error(
-        UnimplementedError('TODO(C2): FirebaseComplaintRepository.byReporter'),
-      );
+  Future<List<Complaint>> byReporter(String userId) async {
+    final AppUser? viewer = _viewer.currentUser;
+    if (viewer == null || viewer.id != userId) return const <Complaint>[];
 
-  /// TODO(C2): query the public `assignedDepartment == department.name` (public
-  /// by design; index `assignedDepartment` + `status`).
+    final Set<String> ids = await _idsIn(_ownedIndex(userId));
+    if (ids.isEmpty) return const <Complaint>[];
+    final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs =
+        await _getByIds(ids);
+    // The ownership set is already in hand; only a maintenance viewer still
+    // needs its claim set.
+    final _Indexes indexes = await _loadIndexes(viewer, owned: ids);
+    return _finish(viewer, docs, indexes);
+  }
+
+  /// Complaints routed to [department].
+  ///
+  /// Reads: the public `assignedDepartment == department.name` query (public by
+  /// design, plan section 5.3; a single-field equality, so no composite index),
+  /// then the same per-role reads as [all].
   @override
-  Future<List<Complaint>> byDepartment(Department department) =>
-      Future<List<Complaint>>.error(
-        UnimplementedError(
-          'TODO(C2): FirebaseComplaintRepository.byDepartment',
-        ),
-      );
+  Future<List<Complaint>> byDepartment(Department department) => _readQuery(
+    _complaints.where('assignedDepartment', isEqualTo: department.name),
+  );
 
-  /// TODO(C2): query the public `status == status.name` (index `status` +
-  /// `updatedAt` for the bounded variant).
+  /// Complaints whose current status is [status].
+  ///
+  /// Reads: the public `status == status.name` query (single-field equality),
+  /// then the same per-role reads as [all].
   @override
   Future<List<Complaint>> byStatus(ComplaintStatus status) =>
-      Future<List<Complaint>>.error(
-        UnimplementedError('TODO(C2): FirebaseComplaintRepository.byStatus'),
+      _readQuery(_complaints.where('status', isEqualTo: status.name));
+
+  // ---------------------------------------------------------------------------
+  // Read helpers
+  // ---------------------------------------------------------------------------
+
+  /// Runs [query] over the public documents and assembles the result for the
+  /// current viewer (the shared body of [all], [byDepartment], [byStatus]).
+  Future<List<Complaint>> _readQuery(Query<Map<String, dynamic>> query) async {
+    final AppUser? viewer = _viewer.currentUser;
+    if (viewer == null) return const <Complaint>[];
+
+    final (snap, indexes) = await _both(query.get(), _loadIndexes(viewer));
+    return _finish(viewer, snap.docs, indexes);
+  }
+
+  /// Adds the admin-only half (for an admin viewer) and assembles every [docs]
+  /// entry with [assembleComplaint]. [useCache] `false` forces a fresh
+  /// `private/admin` read.
+  Future<List<Complaint>> _finish(
+    AppUser viewer,
+    Iterable<DocumentSnapshot<Map<String, dynamic>>> docs,
+    _Indexes indexes, {
+    bool useCache = true,
+  }) async {
+    if (!_isAdmin(viewer)) _adminCache.clear(); // never keep admin data around
+    final Map<String, Map<String, Object?>?> admin = _isAdmin(viewer)
+        ? await _adminJsonFor(docs, useCache: useCache)
+        : const <String, Map<String, Object?>?>{};
+    return _assembleAll(viewer, docs, indexes: indexes, admin: admin);
+  }
+
+  /// The viewer's own index sets: ownership for every non-admin role, claims for
+  /// maintenance only (nobody else's placeholders use them). A pre-read [owned]
+  /// set skips the ownership read.
+  Future<_Indexes> _loadIndexes(AppUser viewer, {Set<String>? owned}) async {
+    final List<Future<Set<String>>> reads = <Future<Set<String>>>[
+      if (owned != null)
+        Future<Set<String>>.value(owned)
+      else if (_readsOwnedIndex(viewer))
+        _idsIn(_ownedIndex(viewer.id))
+      else
+        Future<Set<String>>.value(const <String>{}),
+      if (_readsClaimIndex(viewer))
+        _idsIn(_claimIndex(viewer.id))
+      else
+        Future<Set<String>>.value(const <String>{}),
+    ];
+    final List<Set<String>> sets = await Future.wait<Set<String>>(reads);
+    return _Indexes(owned: sets[0], claimed: sets[1]);
+  }
+
+  /// Like [_loadIndexes] for one complaint: a membership get per index instead
+  /// of listing it.
+  Future<_Indexes> _membershipIndexes(
+    AppUser viewer,
+    String complaintId,
+  ) async {
+    final List<bool> flags = await Future.wait<bool>(<Future<bool>>[
+      _isIndexed(
+        _readsOwnedIndex(viewer) ? _ownedIndex(viewer.id) : null,
+        complaintId,
+      ),
+      _isIndexed(
+        _readsClaimIndex(viewer) ? _claimIndex(viewer.id) : null,
+        complaintId,
+      ),
+    ]);
+    return _Indexes(
+      owned: flags[0] ? <String>{complaintId} : const <String>{},
+      claimed: flags[1] ? <String>{complaintId} : const <String>{},
+    );
+  }
+
+  /// The document ids of the viewer's own index [index] (the index doc id is the
+  /// complaint id; the rules allow listing it for its owner only).
+  Future<Set<String>> _idsIn(
+    CollectionReference<Map<String, dynamic>> index,
+  ) async {
+    final QuerySnapshot<Map<String, dynamic>> snap = await index.get();
+    return <String>{
+      for (final QueryDocumentSnapshot<Map<String, dynamic>> d in snap.docs)
+        d.id,
+    };
+  }
+
+  /// Whether [complaintId] is in [index] (`false` when [index] is `null`).
+  Future<bool> _isIndexed(
+    CollectionReference<Map<String, dynamic>>? index,
+    String complaintId,
+  ) async {
+    if (index == null) return false;
+    return (await index.doc(complaintId).get()).exists;
+  }
+
+  /// The public documents with the given [ids] (ids that do not exist are
+  /// simply absent), ordered by id.
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _getByIds(
+    Iterable<String> ids,
+  ) async {
+    final List<String> sorted = <String>[
+      for (final String id in ids)
+        if (_isDocumentId(id)) id,
+    ]..sort();
+    final List<Future<QuerySnapshot<Map<String, dynamic>>>> reads =
+        <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+    for (int i = 0; i < sorted.length; i += _whereInChunk) {
+      final int end = i + _whereInChunk < sorted.length
+          ? i + _whereInChunk
+          : sorted.length;
+      reads.add(
+        _complaints
+            .where(FieldPath.documentId, whereIn: sorted.sublist(i, end))
+            .get(),
       );
+    }
+    final List<QuerySnapshot<Map<String, dynamic>>> snaps = await Future.wait(
+      reads,
+    );
+    return <QueryDocumentSnapshot<Map<String, dynamic>>>[
+      for (final QuerySnapshot<Map<String, dynamic>> s in snaps) ...s.docs,
+    ]..sort((a, b) => a.id.compareTo(b.id));
+  }
+
+  /// `private/admin` as JSON per complaint id for [docs] (`null` = the document
+  /// does not exist). Admin viewers only: every other role is denied by the
+  /// rules (PR-T4). Reads only what the cache cannot serve; [useCache] `false`
+  /// re-reads everything. Errors propagate (a `permission-denied` here means the
+  /// token is not really an admin's and should not be hidden).
+  Future<Map<String, Map<String, Object?>?>> _adminJsonFor(
+    Iterable<DocumentSnapshot<Map<String, dynamic>>> docs, {
+    bool useCache = true,
+  }) async {
+    final Map<String, Map<String, Object?>?> out =
+        <String, Map<String, Object?>?>{};
+    final List<Future<void>> pending = <Future<void>>[];
+    for (final DocumentSnapshot<Map<String, dynamic>> doc in docs) {
+      final String id = doc.id;
+      final String stamp = _stampOf(doc.data());
+      final _AdminEntry? hit = useCache ? _adminCache[id] : null;
+      if (hit != null && hit.stamp == stamp) {
+        out[id] = hit.json;
+      } else {
+        pending.add(
+          _readAdminJson(id, stamp).then((Map<String, Object?>? json) {
+            out[id] = json;
+          }),
+        );
+      }
+    }
+    if (pending.isNotEmpty) await Future.wait(pending);
+    return out;
+  }
+
+  /// One `private/admin` get, remembered in [_adminCache] under [stamp].
+  Future<Map<String, Object?>?> _readAdminJson(
+    String complaintId,
+    String stamp,
+  ) async {
+    final DocumentSnapshot<Map<String, dynamic>> snap = await _adminRef(
+      complaintId,
+    ).get();
+    final Map<String, Object?>? json = snap.exists
+        ? documentToJson(snap.data())
+        : null;
+    _adminCache[complaintId] = _AdminEntry(stamp, json);
+    return json;
+  }
+
+  /// [assembleComplaint] for every doc in [docs], skipping undecodable ones.
+  List<Complaint> _assembleAll(
+    AppUser viewer,
+    Iterable<DocumentSnapshot<Map<String, dynamic>>> docs, {
+    required _Indexes indexes,
+    required Map<String, Map<String, Object?>?> admin,
+  }) {
+    final List<Complaint> out = <Complaint>[];
+    for (final DocumentSnapshot<Map<String, dynamic>> doc in docs) {
+      try {
+        out.add(
+          assembleComplaint(
+            publicDoc: documentToJson(doc.data(), id: doc.id),
+            adminDoc: admin[doc.id],
+            viewer: viewer,
+            ownedByViewer: indexes.owned.contains(doc.id),
+            claimedByViewer: indexes.claimed.contains(doc.id),
+          ),
+        );
+        _remember(doc);
+      } on Object catch (e) {
+        // One bad document must not take the whole board down.
+        debugPrint('FirebaseComplaintRepository: skipped ${doc.id} ($e)');
+      }
+    }
+    return out;
+  }
+
+  /// Remembers the public document's `version` for the C3 write path.
+  void _remember(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final Object? version = doc.data()?['version'];
+    if (version is num) _versions[doc.id] = version.toInt();
+  }
 
   /// Persists a new complaint prepared by `ComplaintService.submit`.
   ///
@@ -258,11 +540,291 @@ class FirebaseComplaintRepository implements ComplaintRepository {
 
   /// The full list now and whenever it changes.
   ///
-  /// TODO(C2): bounded `complaints` snapshot listener combined with the
-  /// viewer's `userComplaints` and `staffClaims` listeners (plan section 5.3),
-  /// assembling each emission with [assembleComplaint].
+  /// Joins, per subscription (plan section 5.3): the public `complaints`
+  /// snapshot listener with the viewer's own `userComplaints` listener
+  /// (non-admin) and `staffClaims` listener (maintenance), and re-assembles the
+  /// list on every event from any of them. An admin has no index listeners; each
+  /// public snapshot instead triggers `private/admin` gets for the complaints
+  /// whose `version` / `updatedAt` changed (the rules only change `private/admin`
+  /// together with a public `version` bump, so the public listener is a complete
+  /// change signal).
+  ///
+  /// Nothing is emitted until every source the viewer's role needs has delivered
+  /// its first snapshot, so there is no flash of "not mine" ownership.
+  ///
+  /// **The stream follows the session.** The apps keep one long-lived raw
+  /// provider over this stream and do not re-subscribe on sign-out / sign-in, so
+  /// when the [AuthRepository] is a [FirebaseAuthRepository] the stream listens
+  /// to [FirebaseAuthRepository.authChanges]: on sign-out it cancels every
+  /// Firestore listener and emits an empty list (dropping the previous user's
+  /// data), and on sign-in (or a role / department change) it re-subscribes as
+  /// the new viewer. Listener errors that are only the session ending are
+  /// swallowed; any other error is delivered as a stream error (the app's
+  /// Retry re-subscribes).
   @override
-  Stream<List<Complaint>> watchAll() => Stream<List<Complaint>>.error(
-    UnimplementedError('TODO(C2): FirebaseComplaintRepository.watchAll'),
-  );
+  Stream<List<Complaint>> watchAll() => _ComplaintFeed(this).stream;
+}
+
+// -----------------------------------------------------------------------------
+// Viewer-scoped read plumbing (file-private)
+// -----------------------------------------------------------------------------
+
+/// Largest id list handed to one `whereIn` (Firestore allows 30; 10 is safe on
+/// every backend).
+const int _whereInChunk = 10;
+
+/// Admins are the only viewers who read `private/admin` (rules, PR-T4); this is
+/// `UserRole.canSeeReporterIdentity`.
+bool _isAdmin(AppUser viewer) => viewer.role.canSeeReporterIdentity;
+
+/// Every non-admin role reads its own `userComplaints` index to set the
+/// `reporter.userId` placeholder (plan section 5.3).
+bool _readsOwnedIndex(AppUser viewer) => !_isAdmin(viewer);
+
+/// Only maintenance reads its own `staffClaims` index: it is the only role
+/// whose `assignment.assigneeId` placeholder depends on it.
+bool _readsClaimIndex(AppUser viewer) => viewer.role == UserRole.maintenance;
+
+/// Whether two sessions are the same viewer for read purposes (same uid and the
+/// same claims-derived role and department).
+bool _sameViewer(AppUser? a, AppUser? b) =>
+    a?.id == b?.id && a?.role == b?.role && a?.department == b?.department;
+
+/// A usable Firestore document id (non-empty, no path separator).
+bool _isDocumentId(String id) =>
+    id.isNotEmpty && !id.contains('/') && id != '.' && id != '..';
+
+/// Change stamp of a public document: its `version` plus `updatedAt`. Equal
+/// stamps mean `private/admin` has not changed either.
+String _stampOf(Map<String, dynamic>? data) {
+  final Object? updated = data?['updatedAt'];
+  final Object? millis = updated is Timestamp
+      ? updated.millisecondsSinceEpoch
+      : updated;
+  return '${data?['version']}@$millis';
+}
+
+/// Awaits [a] and [b] concurrently. Unlike a record's `.wait`, a failure
+/// propagates as the original exception (callers catch `FirebaseException`).
+Future<(A, B)> _both<A, B>(Future<A> a, Future<B> b) async {
+  final List<Object?> results = await Future.wait<Object?>(<Future<Object?>>[
+    a,
+    b,
+  ]);
+  return (results[0] as A, results[1] as B);
+}
+
+/// The ids of the viewer's own complaints and claims (plan section 5.3).
+class _Indexes {
+  const _Indexes({
+    this.owned = const <String>{},
+    this.claimed = const <String>{},
+  });
+
+  /// Complaint ids in `userComplaints/{uid}/items`.
+  final Set<String> owned;
+
+  /// Complaint ids in `staffClaims/{uid}/items`.
+  final Set<String> claimed;
+}
+
+/// One cached `private/admin` read (null [json] = the document does not exist).
+class _AdminEntry {
+  const _AdminEntry(this.stamp, this.json);
+
+  final String stamp;
+  final Map<String, Object?>? json;
+}
+
+/// One [FirebaseComplaintRepository.watchAll] subscription: the public
+/// `complaints` listener joined with the viewer's own index listeners (plan
+/// section 5.3), re-attached whenever the session's viewer changes.
+///
+/// Created per `watchAll()` call; listeners start on the first listen and are
+/// cancelled when the subscriber cancels.
+class _ComplaintFeed {
+  _ComplaintFeed(this._repo) {
+    _controller = StreamController<List<Complaint>>(
+      onListen: _start,
+      onCancel: _stop,
+    );
+  }
+
+  final FirebaseComplaintRepository _repo;
+  late final StreamController<List<Complaint>> _controller;
+
+  StreamSubscription<AppUser?>? _authSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _publicSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _ownedSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _claimedSub;
+
+  /// The viewer the current listeners were opened for (`null` = signed out).
+  AppUser? _user;
+
+  /// Latest snapshot / id sets (`null` until the source has delivered).
+  QuerySnapshot<Map<String, dynamic>>? _public;
+  Set<String>? _owned;
+  Set<String>? _claimed;
+
+  /// Bumped on every (re)attach so late events of cancelled listeners and
+  /// in-flight admin reads are dropped.
+  int _epoch = 0;
+
+  /// Bumped on every assembly so only the newest in-flight admin read emits.
+  int _generation = 0;
+  bool _stopped = false;
+
+  Stream<List<Complaint>> get stream => _controller.stream;
+
+  void _start() {
+    final AuthRepository auth = _repo._viewer;
+    if (auth is FirebaseAuthRepository) {
+      // Subscribe before reading currentUser so no change can fall in between.
+      _authSub = auth.authChanges.listen((AppUser? user) => _attach(user));
+    }
+    _attach(auth.currentUser, force: true);
+  }
+
+  Future<void> _stop() async {
+    _stopped = true;
+    final StreamSubscription<AppUser?>? auth = _authSub;
+    _authSub = null;
+    _detach();
+    await auth?.cancel();
+  }
+
+  /// (Re)opens the listeners for [next]; a no-op when it is the viewer already
+  /// attached (unless [force]).
+  void _attach(AppUser? next, {bool force = false}) {
+    if (_stopped) return;
+    if (!force && _sameViewer(_user, next)) return;
+
+    _detach();
+    _user = next;
+    if (next == null) {
+      // Signed out: drop the previous user's data from the app's state.
+      _repo._adminCache.clear();
+      _emit(const <Complaint>[]);
+      return;
+    }
+    if (!_isAdmin(next)) _repo._adminCache.clear();
+
+    final int epoch = _epoch;
+    _publicSub = _repo._complaints.snapshots().listen(
+      (QuerySnapshot<Map<String, dynamic>> snap) {
+        if (epoch != _epoch) return;
+        _public = snap;
+        _refresh();
+      },
+      onError: (Object error, StackTrace stack) => _fail(epoch, error, stack),
+    );
+    if (_readsOwnedIndex(next)) {
+      _ownedSub = _repo._ownedIndex(next.id).snapshots().listen(
+        (QuerySnapshot<Map<String, dynamic>> snap) {
+          if (epoch != _epoch) return;
+          _owned = <String>{for (final d in snap.docs) d.id};
+          _refresh();
+        },
+        onError: (Object error, StackTrace stack) =>
+            _fail(epoch, error, stack),
+      );
+    }
+    if (_readsClaimIndex(next)) {
+      _claimedSub = _repo._claimIndex(next.id).snapshots().listen(
+        (QuerySnapshot<Map<String, dynamic>> snap) {
+          if (epoch != _epoch) return;
+          _claimed = <String>{for (final d in snap.docs) d.id};
+          _refresh();
+        },
+        onError: (Object error, StackTrace stack) =>
+            _fail(epoch, error, stack),
+      );
+    }
+  }
+
+  /// Cancels every Firestore listener and forgets the data they delivered.
+  void _detach() {
+    _epoch++;
+    _generation++;
+    final List<StreamSubscription<Object?>?> subs =
+        <StreamSubscription<Object?>?>[_publicSub, _ownedSub, _claimedSub];
+    _publicSub = null;
+    _ownedSub = null;
+    _claimedSub = null;
+    for (final StreamSubscription<Object?>? sub in subs) {
+      if (sub != null) unawaited(sub.cancel());
+    }
+    _public = null;
+    _owned = null;
+    _claimed = null;
+  }
+
+  /// Re-assembles and emits the list once every source the viewer needs has
+  /// delivered.
+  void _refresh() {
+    final AppUser? viewer = _user;
+    final QuerySnapshot<Map<String, dynamic>>? snap = _public;
+    if (viewer == null || snap == null) return;
+    if (_readsOwnedIndex(viewer) && _owned == null) return;
+    if (_readsClaimIndex(viewer) && _claimed == null) return;
+
+    final _Indexes indexes = _Indexes(
+      owned: _owned ?? const <String>{},
+      claimed: _claimed ?? const <String>{},
+    );
+    final int generation = ++_generation;
+    if (_isAdmin(viewer)) {
+      unawaited(_refreshAdmin(viewer, snap, _epoch, generation));
+    } else {
+      _emit(
+        _repo._assembleAll(
+          viewer,
+          snap.docs,
+          indexes: indexes,
+          admin: const <String, Map<String, Object?>?>{},
+        ),
+      );
+    }
+  }
+
+  /// The admin path of [_refresh]: fetches the changed `private/admin`
+  /// documents, then emits unless a newer snapshot or a re-attach superseded
+  /// this one while the reads were in flight.
+  Future<void> _refreshAdmin(
+    AppUser viewer,
+    QuerySnapshot<Map<String, dynamic>> snap,
+    int epoch,
+    int generation,
+  ) async {
+    try {
+      final Map<String, Map<String, Object?>?> admin = await _repo
+          ._adminJsonFor(snap.docs);
+      if (_stopped || epoch != _epoch || generation != _generation) return;
+      _emit(
+        _repo._assembleAll(
+          viewer,
+          snap.docs,
+          indexes: const _Indexes(),
+          admin: admin,
+        ),
+      );
+    } on Object catch (e, st) {
+      _fail(epoch, e, st);
+    }
+  }
+
+  /// Forwards a listener / read error, except when it is only the session
+  /// ending or switching: Firestore revokes the old viewer's listeners before
+  /// the auth event that re-attaches (or empties) the feed has been delivered.
+  void _fail(int epoch, Object error, StackTrace stack) {
+    if (_stopped || epoch != _epoch) return;
+    final AppUser? live = _repo._viewer.currentUser;
+    if (live == null || !_sameViewer(live, _user)) return;
+    _controller.addError(error, stack);
+  }
+
+  void _emit(List<Complaint> complaints) {
+    if (_stopped || _controller.isClosed) return;
+    _controller.add(complaints);
+  }
 }
